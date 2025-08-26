@@ -18,6 +18,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from model_factory import ModelFactory, TinyLlamaModel
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -44,6 +46,7 @@ class ChatRequest(BaseModel):
     context: Optional[str] = None
     max_tokens: Optional[int] = 200
     temperature: Optional[float] = 0.7
+    model: Optional[str] = None  # Allow specifying model
 
 class ChatResponse(BaseModel):
     """Response model for character chat."""
@@ -67,11 +70,9 @@ class RAGLLMService:
     def __init__(self):
         """Initialize the RAG LLM service."""
         self.characters = self._load_characters()
-        self.model = None
-        self.model_path = None
+        self.model_factory = ModelFactory()
         self.embedding_model = None
         self.db_pool = None
-        self._load_model()
         self._load_embedding_model()
         # Database will be initialized on first use
         logger.info("RAG LLM service initialized")
@@ -244,11 +245,8 @@ class RAGLLMService:
             return []
     
     def _generate_response(self, message: str, character: str, context_lines: List[Dict[str, Any]] = None,
-                          max_tokens: int = 200, temperature: float = 0.7) -> Dict[str, Any]:
-        """Generate a response using the loaded model with RAG context."""
-        if not self.model:
-            raise RuntimeError("Model not loaded")
-        
+                           max_tokens: int = 200, temperature: float = 0.7, model_name: str = None) -> Dict[str, Any]:
+        """Generate a response using the model factory with RAG context."""
         try:
             # Build context from retrieved lines
             context_text = ""
@@ -268,15 +266,18 @@ Speaking Style: {self.characters.get(character, {}).get('speaking_style', '')}
 
 {character}:"""
             
-            response = self.model(
-                prompt,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                stop=["User:", "\n\n", "###"],
-                echo=False
+            # Use model factory to generate response
+            generated_text = self.model_factory.generate_response(
+                prompt, max_tokens, temperature, model_name
             )
             
-            generated_text = response['choices'][0]['text'].strip()
+            # Clean up response based on model type
+            current_model = self.model_factory.get_model(model_name)
+            if isinstance(current_model, TinyLlamaModel):
+                # TinyLlama might include system tags, clean them
+                if generated_text.startswith("<|assistant|>"):
+                    generated_text = generated_text[len("<|assistant|>"):].strip()
+            
             if generated_text.startswith(f"{character}:"):
                 generated_text = generated_text[len(f"{character}:"):].strip()
             
@@ -293,7 +294,7 @@ Speaking Style: {self.characters.get(character, {}).get('speaking_style', '')}
             raise RuntimeError(f"Model generation failed: {e}")
     
     async def chat_with_character(self, message: str, character: str, context: str = None,
-                                 max_tokens: int = 200, temperature: float = 0.7) -> Dict[str, Any]:
+                                  max_tokens: int = 200, temperature: float = 0.7, model: str = None) -> Dict[str, Any]:
         """Chat with a Star Wars character using RAG."""
         if character not in self.characters:
             raise RuntimeError(f"Unknown character: {character}")
@@ -305,9 +306,12 @@ Speaking Style: {self.characters.get(character, {}).get('speaking_style', '')}
             context_lines = await self._get_relevant_context(message, character)
             
             # Generate response with context
-            generation_result = self._generate_response(message, character, context_lines, max_tokens, temperature)
+            generation_result = self._generate_response(message, character, context_lines, max_tokens, temperature, model)
             
             processing_time = time.time() - start_time
+            
+            # Get current model info
+            current_model_info = self.model_factory.get_current_model_info()
             
             # Extract response and prompt from generation result
             response_text = generation_result["response"]
@@ -323,11 +327,12 @@ Speaking Style: {self.characters.get(character, {}).get('speaking_style', '')}
                     "character": character,
                     "max_tokens": max_tokens,
                     "temperature": temperature,
-                    "context": context
+                    "context": context,
+                    "model": model or current_model_info.get("name", "unknown")
                 },
                 "metadata": {
-                    "model": "phi-2",
-                    "model_path": self.model_path,
+                    "model": current_model_info.get("name", "unknown"),
+                    "model_path": current_model_info.get("model_path", "unknown"),
                     "processing_time": processing_time,
                     "max_tokens": max_tokens,
                     "temperature": temperature,
@@ -357,13 +362,15 @@ async def health_check():
     
     db_status = "connected" if llm_service.db_pool else "disconnected"
     
+    current_model_info = llm_service.model_factory.get_current_model_info()
     return {
         "status": "healthy",
         "service": "llm",
-        "model": "phi-2",
-        "model_path": llm_service.model_path,
+        "model": current_model_info.get("name", "unknown"),
+        "model_path": current_model_info.get("model_path", "unknown"),
         "database": db_status,
-        "characters": list(llm_service.characters.keys())
+        "characters": list(llm_service.characters.keys()),
+        "available_models": list(llm_service.model_factory.get_available_models().keys())
     }
 
 @app.post("/chat", response_model=ChatResponse)
@@ -378,7 +385,8 @@ async def chat(request: ChatRequest):
             character=request.character,
             context=request.context,
             max_tokens=request.max_tokens,
-            temperature=request.temperature
+            temperature=request.temperature,
+            model=request.model
         )
         
         return ChatResponse(
@@ -406,6 +414,32 @@ async def get_characters():
         "characters": list(llm_service.characters.keys()),
         "count": len(llm_service.characters)
     }
+
+@app.get("/models")
+async def get_models():
+    """Get available models."""
+    if not llm_service:
+        raise HTTPException(status_code=503, detail="LLM service not available")
+    
+    return {
+        "available_models": llm_service.model_factory.get_available_models(),
+        "current_model": llm_service.model_factory.get_current_model_info()
+    }
+
+@app.post("/models/{model_name}/switch")
+async def switch_model(model_name: str):
+    """Switch to a different model."""
+    if not llm_service:
+        raise HTTPException(status_code=503, detail="LLM service not available")
+    
+    try:
+        llm_service.model_factory.set_current_model(model_name)
+        return {
+            "message": f"Switched to {model_name}",
+            "current_model": llm_service.model_factory.get_current_model_info()
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/")
 async def root():

@@ -22,6 +22,8 @@ function App() {
   const [isTtsPlaying, setIsTtsPlaying] = useState(false);
   const [showExplainability, setShowExplainability] = useState(false);
   const [explainabilityData, setExplainabilityData] = useState(null);
+  const [selectedModel, setSelectedModel] = useState('phi-2');
+  const [availableModels, setAvailableModels] = useState({});
   
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -88,6 +90,7 @@ function App() {
   // Check service health on component mount
   useEffect(() => {
     checkServiceHealth();
+    loadAvailableModels();
     const interval = setInterval(checkServiceHealth, 30000); // Check every 30 seconds
     return () => clearInterval(interval);
   }, []);
@@ -134,6 +137,33 @@ function App() {
   const addLog = (message) => {
     const timestamp = new Date().toLocaleTimeString();
     setLogs(prev => [...prev.slice(-9), `${timestamp}: ${message}`]);
+  };
+
+  const loadAvailableModels = async () => {
+    try {
+      const response = await axios.get(`${process.env.REACT_APP_LLM_URL || 'http://localhost:5003'}/models`);
+      setAvailableModels(response.data.available_models || {});
+      if (response.data.current_model) {
+        setSelectedModel(Object.keys(response.data.available_models || {}).find(key => 
+          response.data.available_models[key].name === response.data.current_model.name
+        ) || 'phi-2');
+      }
+      addLog('🤖 Models loaded successfully');
+    } catch (error) {
+      console.error('Error loading models:', error);
+      addLog('❌ Failed to load models');
+    }
+  };
+
+  const switchModel = async (modelName) => {
+    try {
+      await axios.post(`${process.env.REACT_APP_LLM_URL || 'http://localhost:5003'}/models/${modelName}/switch`);
+      setSelectedModel(modelName);
+      addLog(`🔄 Switched to ${modelName} model`);
+    } catch (error) {
+      console.error('Error switching model:', error);
+      addLog('❌ Failed to switch model');
+    }
   };
 
   const startRecording = async () => {
@@ -226,7 +256,11 @@ function App() {
       
       // Step 2: Send text to LLM service
       const llmStartTime = Date.now();
-      const llmResponse = await axios.post(`${process.env.REACT_APP_LLM_URL || 'http://localhost:5003'}/chat`, llmRequestData);
+      const llmRequestDataWithModel = {
+        ...llmRequestData,
+        model: selectedModel
+      };
+      const llmResponse = await axios.post(`${process.env.REACT_APP_LLM_URL || 'http://localhost:5003'}/chat`, llmRequestDataWithModel);
       const llmLatency = Date.now() - llmStartTime;
       
              // Store the complete LLM response for RAG explainability
@@ -434,10 +468,10 @@ function App() {
 
         {/* Middle Column - Chat */}
         <div className="chat-panel">
-          <div className="character-selector">
-            <h3>Choose Your Character</h3>
-            <div className="character-grid">
-                             {characters.map(character => (
+                     <div className="character-selector">
+             <h3>Choose Your Character</h3>
+             <div className="character-grid">
+               {characters.map(character => (
                  <div
                    key={character.name}
                    className={`character-card ${selectedCharacter === character.name ? 'selected' : ''}`}
@@ -448,8 +482,29 @@ function App() {
                    <h4>{character.name}</h4>
                  </div>
                ))}
-            </div>
-          </div>
+             </div>
+           </div>
+
+           <div className="model-selector">
+             <h3>🤖 Choose Your Model</h3>
+             <div className="model-grid">
+               {Object.entries(availableModels).map(([key, model]) => (
+                 <div
+                   key={key}
+                   className={`model-card ${selectedModel === key ? 'selected' : ''}`}
+                   onClick={() => switchModel(key)}
+                 >
+                   <div className="model-icon">🤖</div>
+                   <h4>{model.name}</h4>
+                   <p className="model-description">{model.description}</p>
+                   <div className="model-specs">
+                     <span>Context: {model.context_length}</span>
+                     <span>Threads: {model.threads}</span>
+                   </div>
+                 </div>
+               ))}
+             </div>
+           </div>
 
           <div className="messages-container">
             {messages.map((message, index) => (

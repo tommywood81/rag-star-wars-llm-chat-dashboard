@@ -1,0 +1,39 @@
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Create models directory
+RUN mkdir -p /app/models
+
+# Download TinyLlama-1.1B model (Q4_K_M quantized version)
+RUN wget -O /app/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf \
+    https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf
+
+# Copy application code
+COPY llm-service/llm_service_standalone.py /app/llm_service.py
+COPY llm-service/model_factory.py /app/model_factory.py
+COPY llm-service/characters.json /app/characters.json
+COPY requirements.txt /app/requirements.txt
+
+# Expose port
+EXPOSE 5003
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:5003/health || exit 1
+
+# Run the application
+CMD ["python", "llm_service_standalone.py"]
