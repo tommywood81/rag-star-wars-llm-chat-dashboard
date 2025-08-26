@@ -116,8 +116,8 @@ class RAGLLMService:
             self.model = llama_cpp.Llama(
                 model_path=str(model_path),
                 n_ctx=1024,
-                n_threads=2,
-                n_batch=256,
+                n_threads=4,  # Increased from 2 to 4 for better performance
+                n_batch=512,  # Increased batch size for better throughput
                 n_gpu_layers=0,
                 verbose=False
             )
@@ -209,9 +209,14 @@ class RAGLLMService:
                     logger.warning(f"Character {character} not found in database")
                     return []
                 
-                # Query for similar dialogue lines
+                # Query for similar dialogue lines with similarity scores
                 query = """
-                SELECT dl.dialogue, dl.cleaned_dialogue, dl.scene_info, m.title as movie_title
+                SELECT 
+                    dl.dialogue, 
+                    dl.cleaned_dialogue, 
+                    dl.scene_info, 
+                    m.title as movie_title,
+                    1 - (dl.embedding <=> $2) as similarity_score
                 FROM dialogue_lines dl
                 JOIN movies m ON dl.movie_id = m.id
                 WHERE dl.character_id = $1
@@ -227,7 +232,8 @@ class RAGLLMService:
                         "dialogue": row['dialogue'],
                         "cleaned_dialogue": row['cleaned_dialogue'],
                         "scene_info": row['scene_info'],
-                        "movie_title": row['movie_title']
+                        "movie_title": row['movie_title'],
+                        "similarity_score": float(row['similarity_score']) if row['similarity_score'] is not None else 0.0
                     })
                 
                 logger.info(f"Retrieved {len(context_lines)} relevant context lines for {character}")

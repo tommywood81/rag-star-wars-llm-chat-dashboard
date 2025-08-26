@@ -33,6 +33,8 @@ function App() {
       name: 'Luke Skywalker', 
       emoji: '⚔️',
       color: '#4a90e2',
+      voice: 'en-us',
+      speed: 1.2,
       personality: 'Optimistic, brave, determined, and committed to doing what\'s right. He believes in the Force and the power of good.',
       speaking_style: 'Speaks with hope and determination. Uses phrases like \'The Force is with us\' and \'I believe in the Force.\''
     },
@@ -40,6 +42,8 @@ function App() {
       name: 'Darth Vader', 
       emoji: '🖤',
       color: '#e74c3c',
+      voice: 'en',
+      speed: 0.8,
       personality: 'Intimidating, commanding, conflicted, and powerful. He is both feared and respected.',
       speaking_style: 'Speaks with authority and menace. Uses phrases like \'I find your lack of faith disturbing\' and \'The Force is strong with this one.\''
     },
@@ -47,6 +51,8 @@ function App() {
       name: 'Yoda', 
       emoji: '🟢',
       color: '#27ae60',
+      voice: 'en-gb',
+      speed: 0.7,
       personality: 'Wise, patient, philosophical, and deeply connected to the Force. He speaks in a unique, backwards manner.',
       speaking_style: 'Speaks in a distinctive backwards word order. Uses phrases like \'Do or do not, there is no try\' and \'The Force is strong with you.\''
     },
@@ -54,6 +60,8 @@ function App() {
       name: 'Han Solo', 
       emoji: '🤠',
       color: '#f39c12',
+      voice: 'en-au',
+      speed: 1.1,
       personality: 'Confident, sarcastic, loyal, and resourceful. He\'s a bit of a rogue but has a heart of gold.',
       speaking_style: 'Speaks with confidence and sarcasm. Uses phrases like \'I know\' and \'Great, kid! Don\'t get cocky.\''
     },
@@ -61,6 +69,8 @@ function App() {
       name: 'Princess Leia', 
       emoji: '👑',
       color: '#9b59b6',
+      voice: 'en-gb',
+      speed: 1.0,
       personality: 'Strong-willed, intelligent, courageous, and determined. She\'s a natural leader and diplomat.',
       speaking_style: 'Speaks with authority and intelligence. Uses phrases like \'Help me, Obi-Wan Kenobi\' and \'I love you.\''
     },
@@ -68,6 +78,8 @@ function App() {
       name: 'Obi-Wan Kenobi', 
       emoji: '🧙‍♂️',
       color: '#3498db',
+      voice: 'en-gb',
+      speed: 0.9,
       personality: 'Wise, patient, diplomatic, and deeply knowledgeable about the Force and Jedi ways.',
       speaking_style: 'Speaks with wisdom and calm authority. Uses phrases like \'The Force will be with you, always\' and \'These aren\'t the droids you\'re looking for.\''
     }
@@ -255,9 +267,11 @@ function App() {
       
       // Step 3: Convert response to speech
       const ttsStartTime = Date.now();
+      const characterData = getSelectedCharacterData();
       const ttsResponse = await axios.post(`${process.env.REACT_APP_TTS_URL || 'http://localhost:5002'}/synthesize`, {
         text: characterResponse,
-        voice: 'en'
+        voice: characterData?.voice || 'en',
+        speed: characterData?.speed || 1.0
       });
              const ttsLatency = Date.now() - ttsStartTime;
        addLog(`🔊 TTS generated in ${ttsLatency}ms`);
