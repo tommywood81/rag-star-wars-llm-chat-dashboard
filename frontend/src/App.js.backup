@@ -7,16 +7,18 @@ function App() {
   const [selectedCharacter, setSelectedCharacter] = useState('Luke Skywalker');
   const [messages, setMessages] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [debugMode, setDebugMode] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState('checking');
   const [performanceMetrics, setPerformanceMetrics] = useState({});
   const [systemPrompt, setSystemPrompt] = useState('');
+  const [showSystemPrompt, setShowSystemPrompt] = useState(false);
   const [logs, setLogs] = useState([]);
   const [lastRequestData, setLastRequestData] = useState(null);
   const [lastLLMRequest, setLastLLMRequest] = useState(null);
   const [lastLLMResponse, setLastLLMResponse] = useState(null);
   const [ragContext, setRagContext] = useState([]);
-  const [buildVersion] = useState('v1.4.0-debug');
+  const [buildVersion] = useState('v1.3.0-debug');
   const [liveTranscription, setLiveTranscription] = useState('');
   const [ttsProgress, setTtsProgress] = useState(0);
   const [isTtsPlaying, setIsTtsPlaying] = useState(false);
@@ -31,42 +33,48 @@ function App() {
   const characters = [
     { 
       name: 'Luke Skywalker', 
-      emoji: '⚔️',
+      description: 'Jedi Knight',
+      image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face&sat=-50&brightness=0.8',
       color: '#4a90e2',
       personality: 'Optimistic, brave, determined, and committed to doing what\'s right. He believes in the Force and the power of good.',
       speaking_style: 'Speaks with hope and determination. Uses phrases like \'The Force is with us\' and \'I believe in the Force.\''
     },
     { 
       name: 'Darth Vader', 
-      emoji: '🖤',
+      description: 'Sith Lord',
+      image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face&sat=-80&brightness=0.3&contrast=1.5',
       color: '#e74c3c',
       personality: 'Intimidating, commanding, conflicted, and powerful. He is both feared and respected.',
       speaking_style: 'Speaks with authority and menace. Uses phrases like \'I find your lack of faith disturbing\' and \'The Force is strong with this one.\''
     },
     { 
       name: 'Yoda', 
-      emoji: '🟢',
+      description: 'Jedi Master',
+      image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face&sat=-30&brightness=0.9&hue=120',
       color: '#27ae60',
       personality: 'Wise, patient, philosophical, and deeply connected to the Force. He speaks in a unique, backwards manner.',
       speaking_style: 'Speaks in a distinctive backwards word order. Uses phrases like \'Do or do not, there is no try\' and \'The Force is strong with you.\''
     },
     { 
       name: 'Han Solo', 
-      emoji: '🤠',
+      description: 'Smuggler',
+      image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face&sat=-20&brightness=0.85',
       color: '#f39c12',
       personality: 'Confident, sarcastic, loyal, and resourceful. He\'s a bit of a rogue but has a heart of gold.',
       speaking_style: 'Speaks with confidence and sarcasm. Uses phrases like \'I know\' and \'Great, kid! Don\'t get cocky.\''
     },
     { 
       name: 'Princess Leia', 
-      emoji: '👑',
+      description: 'Rebel Leader',
+      image: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face&sat=-30&brightness=0.9',
       color: '#9b59b6',
       personality: 'Strong-willed, intelligent, courageous, and determined. She\'s a natural leader and diplomat.',
       speaking_style: 'Speaks with authority and intelligence. Uses phrases like \'Help me, Obi-Wan Kenobi\' and \'I love you.\''
     },
     { 
       name: 'Obi-Wan Kenobi', 
-      emoji: '🧙‍♂️',
+      description: 'Jedi Master',
+      image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face&sat=-40&brightness=0.8&hue=200',
       color: '#3498db',
       personality: 'Wise, patient, diplomatic, and deeply knowledgeable about the Force and Jedi ways.',
       speaking_style: 'Speaks with wisdom and calm authority. Uses phrases like \'The Force will be with you, always\' and \'These aren\'t the droids you\'re looking for.\''
@@ -91,6 +99,7 @@ function App() {
     setLiveTranscription('');
     setTtsProgress(0);
     setIsTtsPlaying(false);
+    setShowExplainability(false);
     setExplainabilityData(null);
     addLog(`Character changed to ${selectedCharacter}`);
   }, [selectedCharacter]);
@@ -217,34 +226,10 @@ function App() {
       const llmResponse = await axios.post(`${process.env.REACT_APP_LLM_URL || 'http://localhost:5003'}/chat`, llmRequestData);
       const llmLatency = Date.now() - llmStartTime;
       
-             // Store the complete LLM response for RAG explainability
-       setLastLLMResponse(llmResponse.data);
-       setRagContext(llmResponse.data.rag_context || []);
-       setSystemPrompt(llmResponse.data.complete_prompt || '');
-       
-       // Store request data for context panel
-       setLastRequestData({
-         stt_latency: sttLatency,
-         embedding_latency: llmResponse.data.embedding_latency || 0,
-         llm_latency: llmLatency,
-         tts_latency: 0, // Will be updated after TTS
-         total_latency: Date.now() - startTime
-       });
-      
-      // Set explainability data
-      setExplainabilityData({
-        userMessage: text,
-        character: selectedCharacter,
-        ragContext: llmResponse.data.rag_context || [],
-        systemPrompt: llmResponse.data.complete_prompt || '',
-        llmResponse: llmResponse.data.response,
-        performance: {
-          stt: sttLatency,
-          llm: llmLatency,
-          total: Date.now() - startTime
-        },
-        timestamp: new Date().toISOString()
-      });
+      // Store the complete LLM response for RAG explainability
+      setLastLLMResponse(llmResponse.data);
+      setRagContext(llmResponse.data.rag_context || []);
+      setSystemPrompt(llmResponse.data.complete_prompt || '');
       
       const characterResponse = llmResponse.data.response;
       addLog(`🤖 LLM response in ${llmLatency}ms`);
@@ -259,14 +244,8 @@ function App() {
         text: characterResponse,
         voice: 'en'
       });
-             const ttsLatency = Date.now() - ttsStartTime;
-       addLog(`🔊 TTS generated in ${ttsLatency}ms`);
-       
-       // Update request data with TTS latency
-       setLastRequestData(prev => prev ? {
-         ...prev,
-         tts_latency: ttsLatency
-       } : null);
+      const ttsLatency = Date.now() - ttsStartTime;
+      addLog(`🔊 TTS generated in ${ttsLatency}ms`);
       
       // Update performance metrics
       const totalLatency = Date.now() - startTime;
@@ -329,6 +308,18 @@ function App() {
     await processWithLLM(text, startTime);
   };
 
+  const showExplainabilityDetails = () => {
+    if (lastLLMResponse && lastLLMRequest) {
+      setExplainabilityData({
+        request: lastLLMRequest,
+        response: lastLLMResponse,
+        performance: performanceMetrics,
+        character: getSelectedCharacterData()
+      });
+      setShowExplainability(true);
+    }
+  };
+
   const exportConversation = () => {
     const exportData = {
       timestamp: new Date().toISOString(),
@@ -340,8 +331,7 @@ function App() {
         lastResponse: lastLLMResponse,
         performanceMetrics: performanceMetrics,
         ragContext: ragContext,
-        systemPrompt: systemPrompt,
-        explainabilityData: explainabilityData
+        systemPrompt: systemPrompt
       }
     };
     
@@ -373,14 +363,8 @@ function App() {
     return characters.find(char => char.name === selectedCharacter);
   };
 
-  const openExplainability = () => {
-    if (explainabilityData) {
-      setShowExplainability(true);
-    }
-  };
-
   return (
-    <div className="app unified-mode">
+    <div className={`app ${debugMode ? 'debug-mode' : 'immersive-mode'}`}>
       {/* Top Bar */}
       <header className="top-bar">
         <div className="top-bar-left">
@@ -389,64 +373,61 @@ function App() {
             {connectionStatus === 'healthy' ? '🟢 All Systems Operational' : '🔴 System Error'}
           </div>
         </div>
+        <div className="top-bar-right">
+          <button 
+            className={`mode-toggle ${debugMode ? 'debug-active' : 'immersive-active'}`}
+            onClick={() => setDebugMode(!debugMode)}
+          >
+            {debugMode ? '🎬 Immersive Mode' : '🔧 Debug Mode'}
+          </button>
+        </div>
       </header>
 
       <div className="main-content">
-        {/* Left Column - Movie Lines */}
-        <div className="left-panel">
-          <div className="panel-header">
-            <h3>🎬 Movie Lines Retrieved</h3>
-          </div>
-          <div className="movie-lines-panel">
-                         {ragContext.length > 0 ? (
-               ragContext.map((line, index) => (
-                 <div key={index} className="movie-line-item">
-                   <div className="movie-line-header">
-                     <span className="movie-title">{line.movie_title || line.movie || 'Star Wars'}</span>
-                     <span className="relevance-score">Score: {line.similarity_score?.toFixed(3) || line.score?.toFixed(3) || 'N/A'}</span>
-                   </div>
-                   <div className="movie-dialogue">
-                     <strong>{line.character}:</strong> {line.dialogue}
-                   </div>
-                 </div>
-               ))
-             ) : (
-              <div className="empty-state">
-                <p>No movie lines retrieved yet. Send a message to see relevant dialogue!</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Middle Column - Chat */}
-        <div className="chat-panel">
+        {/* Left Column - Conversation */}
+        <div className="conversation-panel">
           <div className="character-selector">
             <h3>Choose Your Character</h3>
             <div className="character-grid">
-                             {characters.map(character => (
-                 <div
-                   key={character.name}
-                   className={`character-card ${selectedCharacter === character.name ? 'selected' : ''}`}
-                   onClick={() => setSelectedCharacter(character.name)}
-                   style={{ borderColor: character.color }}
-                 >
-                   <div className="character-emoji">{character.emoji}</div>
-                   <h4>{character.name}</h4>
-                 </div>
-               ))}
+              {characters.map(character => (
+                <div
+                  key={character.name}
+                  className={`character-card ${selectedCharacter === character.name ? 'selected' : ''}`}
+                  onClick={() => setSelectedCharacter(character.name)}
+                  style={{ borderColor: character.color }}
+                >
+                  <img 
+                    src={character.image} 
+                    alt={character.name}
+                    className="character-avatar"
+                  />
+                  <h4>{character.name}</h4>
+                  <p>{character.description}</p>
+                  {selectedCharacter === character.name && (
+                    <div className="character-details">
+                      <p><strong>Personality:</strong> {character.personality}</p>
+                      <p><strong>Speaking Style:</strong> {character.speaking_style}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
 
           <div className="messages-container">
             {messages.map((message, index) => (
               <div key={index} className={`message ${message.type}`}>
-                                 <div className="message-avatar">
-                   {message.type === 'user' ? (
-                     <div className="user-avatar">⚔️</div>
-                   ) : (
-                     <div className="character-avatar-small">🤖</div>
-                   )}
-                 </div>
+                <div className="message-avatar">
+                  {message.type === 'user' ? (
+                    <div className="user-avatar">⚔️</div>
+                  ) : (
+                    <img 
+                      src={getSelectedCharacterData()?.image} 
+                      alt={selectedCharacter}
+                      className="character-avatar-small"
+                    />
+                  )}
+                </div>
                 <div className="message-content">
                   <strong>{message.type === 'user' ? 'You' : selectedCharacter}:</strong>
                   <p>{message.text}</p>
@@ -520,171 +501,164 @@ function App() {
               >
                 {isMuted ? '🔇' : '🔊'}
               </button>
-              {explainabilityData && (
-                <button
-                  className="explainability-button"
-                  onClick={openExplainability}
-                >
-                  🔍 Explain
-                </button>
-              )}
             </div>
           </div>
         </div>
 
-        {/* Right Column - Context */}
-        <div className="right-panel">
-          <div className="panel-header">
-            <h3>📋 Context Sent to Model</h3>
-          </div>
-          <div className="context-panel">
-            {lastRequestData ? (
-              <div className="context-content">
-                <div className="context-section">
-                  <h4>🎭 Character Context</h4>
-                  <div className="character-context">
-                    <p><strong>Character:</strong> {selectedCharacter}</p>
-                    <p><strong>Personality:</strong> {getSelectedCharacterData()?.personality}</p>
-                    <p><strong>Speaking Style:</strong> {getSelectedCharacterData()?.speaking_style}</p>
-                  </div>
+        {/* Right Column - Debug Info */}
+        {debugMode && (
+          <div className="debug-panel">
+            <div className="debug-section">
+              <h3>📝 System Prompt</h3>
+              <button 
+                className="expand-button"
+                onClick={() => setShowSystemPrompt(!showSystemPrompt)}
+              >
+                {showSystemPrompt ? 'Collapse' : 'Expand'}
+              </button>
+              {showSystemPrompt && systemPrompt && (
+                <div className="code-block">
+                  <pre>{systemPrompt}</pre>
                 </div>
+              )}
+            </div>
 
-                <div className="context-section">
-                  <h4>📝 System Prompt</h4>
-                  <div className="system-prompt">
-                    <pre>{systemPrompt || 'No system prompt available'}</pre>
-                  </div>
+            {ragContext.length > 0 && (
+              <div className="debug-section">
+                <h3>🎬 RAG Context (Top {ragContext.length} Results)</h3>
+                <div className="rag-context-list">
+                  {ragContext.map((context, index) => (
+                    <div key={index} className="rag-context-item">
+                      <div className="rag-context-header">
+                        <span className="movie-title">{context.movie_title}</span>
+                        <span className="scene-info">{context.scene_info}</span>
+                      </div>
+                      <div className="rag-context-dialogue">
+                        "{context.dialogue}"
+                      </div>
+                    </div>
+                  ))}
                 </div>
-
-                <div className="context-section">
-                  <h4>⚡ Performance Metrics</h4>
-                  <div className="performance-metrics">
-                    <div className="metric">
-                      <span>STT Latency:</span>
-                      <span>{lastRequestData?.stt_latency || 'N/A'} ms</span>
-                    </div>
-                    <div className="metric">
-                      <span>Embedding Query:</span>
-                      <span>{lastRequestData?.embedding_latency || 'N/A'} ms</span>
-                    </div>
-                    <div className="metric">
-                      <span>LLM Response:</span>
-                      <span>{lastRequestData?.llm_latency || 'N/A'} ms</span>
-                    </div>
-                    <div className="metric">
-                      <span>TTS Generation:</span>
-                      <span>{lastRequestData?.tts_latency || 'N/A'} ms</span>
-                    </div>
-                  </div>
-                </div>
-
-                                 <div className="context-section">
-                   <h4>🔧 Service Information</h4>
-                   <div className="service-info">
-                     <p><strong>🤖 LLM Model:</strong> GPT-4 (via OpenAI API)</p>
-                     <p><strong>🎤 STT Service:</strong> Whisper (OpenAI)</p>
-                     <p><strong>🔊 TTS Service:</strong> ElevenLabs</p>
-                     <p><strong>🔍 RAG Database:</strong> PostgreSQL + pgvector</p>
-                   </div>
-                 </div>
-
-                 <div className="context-section">
-                   <h4>📋 System Logs</h4>
-                   <div className="logs-container">
-                     {logs.map((log, index) => (
-                       <div key={index} className="log-entry">
-                         {log}
-                       </div>
-                     ))}
-                   </div>
-                 </div>
               </div>
-            ) : (
-              <div className="empty-state">
-                <p>No context available yet. Send a message to see what was sent to the model!</p>
+            )}
+
+            <div className="debug-section">
+              <h3>⚡ Performance Metrics</h3>
+              <div className="metrics-grid">
+                <div className="metric">
+                  <span className="metric-label">STT Latency:</span>
+                  <span className="metric-value">{performanceMetrics.stt || 0}ms</span>
+                </div>
+                <div className="metric">
+                  <span className="metric-label">LLM Response:</span>
+                  <span className="metric-value">{performanceMetrics.llm || 0}ms</span>
+                </div>
+                <div className="metric">
+                  <span className="metric-label">TTS Generation:</span>
+                  <span className="metric-value">{performanceMetrics.tts || 0}ms</span>
+                </div>
+                <div className="metric">
+                  <span className="metric-label">Total Round Trip:</span>
+                  <span className="metric-value">{performanceMetrics.total || 0}ms</span>
+                </div>
+                <div className="metric">
+                  <span className="metric-label">Tokens/sec:</span>
+                  <span className="metric-value">{performanceMetrics.tokensPerSec ? performanceMetrics.tokensPerSec.toFixed(1) : 0}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="debug-section">
+              <h3>📋 System Logs</h3>
+              <div className="logs-container">
+                {logs.map((log, index) => (
+                  <div key={index} className="log-entry">
+                    {log}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {lastLLMResponse && (
+              <div className="debug-section">
+                <h3>🔍 Explainability</h3>
+                <button 
+                  className="explainability-button"
+                  onClick={showExplainabilityDetails}
+                >
+                  View Full Details
+                </button>
               </div>
             )}
           </div>
-        </div>
+        )}
       </div>
 
-             {/* Footer */}
-       <footer className="app-footer">
-         <div className="footer-left">
-           <span className="build-version">Build: {buildVersion}</span>
-         </div>
-         <div className="footer-center">
-           <div className="metrics-footer">
-             <div className="metric-item">
-               <span className="metric-label">🤖 LLM:</span>
-               <span className="metric-value">{performanceMetrics.llm || 0}ms</span>
-             </div>
-             <div className="metric-item">
-               <span className="metric-label">🎤 STT:</span>
-               <span className="metric-value">{performanceMetrics.stt || 0}ms</span>
-             </div>
-             <div className="metric-item">
-               <span className="metric-label">🔊 TTS:</span>
-               <span className="metric-value">{performanceMetrics.tts || 0}ms</span>
-             </div>
-             <div className="metric-item">
-               <span className="metric-label">⚡ Total:</span>
-               <span className="metric-value">{performanceMetrics.total || 0}ms</span>
-             </div>
-             <div className="metric-item">
-               <span className="metric-label">📊 Tokens/sec:</span>
-               <span className="metric-value">{performanceMetrics.tokensPerSec ? performanceMetrics.tokensPerSec.toFixed(1) : 0}</span>
-             </div>
-           </div>
-         </div>
-         <div className="footer-right">
-           <button className="export-button" onClick={exportConversation}>
-             💾 Export Conversation
-           </button>
-         </div>
-       </footer>
+      {/* Footer */}
+      <footer className="app-footer">
+        <div className="footer-left">
+          <span className="build-version">Build: {buildVersion}</span>
+        </div>
+        <div className="footer-right">
+          <button className="export-button" onClick={exportConversation}>
+            💾 Export Conversation
+          </button>
+        </div>
+      </footer>
 
       {/* Explainability Modal */}
       {showExplainability && explainabilityData && (
         <div className="modal-overlay" onClick={() => setShowExplainability(false)}>
-          <div className="explainability-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>🔍 AI Explainability Report</h2>
-              <button className="close-button" onClick={() => setShowExplainability(false)}>
-                ✕
+              <h2>🔍 Explainability Details</h2>
+              <button 
+                className="modal-close"
+                onClick={() => setShowExplainability(false)}
+              >
+                ×
               </button>
             </div>
             
-            <div className="modal-content">
+            <div className="modal-body">
               <div className="explainability-section">
-                <h3>💬 User Input</h3>
-                <p className="user-input">{explainabilityData.userMessage}</p>
-              </div>
-
-              <div className="explainability-section">
-                <h3>🎭 Character Context</h3>
-                <div className="character-context">
-                  <p><strong>Character:</strong> {explainabilityData.character}</p>
-                  <p><strong>Personality:</strong> {getSelectedCharacterData()?.personality}</p>
-                  <p><strong>Speaking Style:</strong> {getSelectedCharacterData()?.speaking_style}</p>
+                <h3>🎭 Character Information</h3>
+                <div className="character-info">
+                  <img 
+                    src={explainabilityData.character?.image} 
+                    alt={explainabilityData.character?.name}
+                    className="character-avatar-large"
+                  />
+                  <div>
+                    <h4>{explainabilityData.character?.name}</h4>
+                    <p><strong>Personality:</strong> {explainabilityData.character?.personality}</p>
+                    <p><strong>Speaking Style:</strong> {explainabilityData.character?.speaking_style}</p>
+                  </div>
                 </div>
               </div>
 
               <div className="explainability-section">
-                <h3>🎬 Retrieved Movie Lines ({explainabilityData.ragContext.length} results)</h3>
-                <div className="movie-lines">
-                  {explainabilityData.ragContext.map((context, index) => (
-                    <div key={index} className="movie-line">
-                      <div className="movie-line-header">
+                <h3>📤 Request Sent to LLM</h3>
+                <div className="code-block">
+                  <pre>{JSON.stringify(explainabilityData.request.payload, null, 2)}</pre>
+                </div>
+              </div>
+
+              <div className="explainability-section">
+                <h3>🎬 Retrieved Movie Lines (RAG Context)</h3>
+                <div className="rag-details">
+                  {explainabilityData.response.rag_context?.map((context, index) => (
+                    <div key={index} className="rag-detail-item">
+                      <div className="rag-detail-header">
                         <span className="movie-title">{context.movie_title}</span>
                         <span className="scene-info">{context.scene_info}</span>
-                        <span className="relevance-score">Relevance: {context.similarity_score ? context.similarity_score.toFixed(3) : 'N/A'}</span>
+                        <span className="similarity-score">Score: {context.similarity?.toFixed(3) || 'N/A'}</span>
                       </div>
-                      <div className="movie-dialogue">
+                      <div className="rag-detail-dialogue">
                         <strong>Dialogue:</strong> "{context.dialogue}"
                       </div>
-                      <div className="movie-context">
-                        <strong>Context:</strong> {context.context || 'No additional context available'}
+                      <div className="rag-detail-character">
+                        <strong>Character:</strong> {context.character || 'Unknown'}
                       </div>
                     </div>
                   ))}
@@ -692,44 +666,45 @@ function App() {
               </div>
 
               <div className="explainability-section">
-                <h3>🤖 System Prompt</h3>
-                <div className="system-prompt">
-                  <pre>{explainabilityData.systemPrompt}</pre>
-                </div>
-              </div>
-
-              <div className="explainability-section">
-                <h3>💭 AI Response</h3>
-                <div className="ai-response">
-                  <p>{explainabilityData.llmResponse}</p>
-                </div>
-              </div>
-
-              <div className="explainability-section">
-                <h3>⚡ Performance Analysis</h3>
-                <div className="performance-analysis">
-                  <div className="performance-item">
-                    <span>STT Processing:</span>
-                    <span>{explainabilityData.performance.stt}ms</span>
-                  </div>
-                  <div className="performance-item">
-                    <span>LLM Generation:</span>
-                    <span>{explainabilityData.performance.llm}ms</span>
-                  </div>
-                  <div className="performance-item">
-                    <span>Total Response Time:</span>
-                    <span>{explainabilityData.performance.total}ms</span>
+                <h3>🤖 LLM Response</h3>
+                <div className="response-details">
+                  <p><strong>Generated Response:</strong></p>
+                  <div className="response-text">
+                    {explainabilityData.response.response}
                   </div>
                 </div>
               </div>
 
               <div className="explainability-section">
-                <h3>📊 Technical Details</h3>
-                <div className="technical-details">
-                  <p><strong>Timestamp:</strong> {new Date(explainabilityData.timestamp).toLocaleString()}</p>
-                  <p><strong>Character:</strong> {explainabilityData.character}</p>
-                  <p><strong>RAG Results:</strong> {explainabilityData.ragContext.length} movie lines retrieved</p>
-                  <p><strong>Response Length:</strong> {explainabilityData.llmResponse.length} characters</p>
+                <h3>⚡ Performance Metrics</h3>
+                <div className="performance-details">
+                  <div className="performance-item">
+                    <span>STT Latency:</span>
+                    <span>{explainabilityData.performance.stt || 0}ms</span>
+                  </div>
+                  <div className="performance-item">
+                    <span>LLM Response Time:</span>
+                    <span>{explainabilityData.performance.llm || 0}ms</span>
+                  </div>
+                  <div className="performance-item">
+                    <span>TTS Generation:</span>
+                    <span>{explainabilityData.performance.tts || 0}ms</span>
+                  </div>
+                  <div className="performance-item">
+                    <span>Total Round Trip:</span>
+                    <span>{explainabilityData.performance.total || 0}ms</span>
+                  </div>
+                  <div className="performance-item">
+                    <span>Tokens per Second:</span>
+                    <span>{explainabilityData.performance.tokensPerSec ? explainabilityData.performance.tokensPerSec.toFixed(1) : 0}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="explainability-section">
+                <h3>📝 Complete System Prompt</h3>
+                <div className="code-block">
+                  <pre>{explainabilityData.response.complete_prompt || 'Not available'}</pre>
                 </div>
               </div>
             </div>
