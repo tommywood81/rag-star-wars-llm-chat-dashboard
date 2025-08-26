@@ -7,13 +7,15 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     build-essential \
     git \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
-COPY requirements.txt .
+COPY llm-service/requirements-llm.txt .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies (CPU only)
+RUN pip install --no-cache-dir -r requirements-llm.txt && \
+    pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch==2.1.0+cpu
 
 # Create models directory
 RUN mkdir -p /app/models
@@ -36,4 +38,4 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:5003/health || exit 1
 
 # Run the application
-CMD ["python", "llm_service_standalone.py"]
+CMD ["python", "llm_service.py"]

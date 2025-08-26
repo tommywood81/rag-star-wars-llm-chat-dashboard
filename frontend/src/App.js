@@ -141,14 +141,40 @@ function App() {
 
   const loadAvailableModels = async () => {
     try {
-      const response = await axios.get(`${process.env.REACT_APP_LLM_URL || 'http://localhost:5003'}/models`);
-      setAvailableModels(response.data.available_models || {});
-      if (response.data.current_model) {
-        setSelectedModel(Object.keys(response.data.available_models || {}).find(key => 
-          response.data.available_models[key].name === response.data.current_model.name
-        ) || 'phi-2');
+      // Check both LLM services
+      const [phi2Response, tinyllamaResponse] = await Promise.allSettled([
+        axios.get(`${process.env.REACT_APP_LLM_URL || 'http://localhost:5003'}/models`),
+        axios.get('http://localhost:5004/models')
+      ]);
+
+      const allModels = {};
+
+      // Add Phi-2 models if available
+      if (phi2Response.status === 'fulfilled') {
+        const phi2Models = phi2Response.value.data.available_models || {};
+        Object.assign(allModels, phi2Models);
+        addLog('✅ Phi-2 models loaded');
+      } else {
+        addLog('❌ Phi-2 service unavailable');
       }
-      addLog('🤖 Models loaded successfully');
+
+      // Add TinyLlama models if available
+      if (tinyllamaResponse.status === 'fulfilled') {
+        const tinyllamaModels = tinyllamaResponse.value.data.available_models || {};
+        Object.assign(allModels, tinyllamaModels);
+        addLog('✅ TinyLlama models loaded');
+      } else {
+        addLog('❌ TinyLlama service unavailable');
+      }
+
+      setAvailableModels(allModels);
+      
+      // Set default model if available
+      if (Object.keys(allModels).length > 0) {
+        setSelectedModel(Object.keys(allModels)[0]);
+      }
+      
+      addLog(`🤖 ${Object.keys(allModels).length} models loaded successfully`);
     } catch (error) {
       console.error('Error loading models:', error);
       addLog('❌ Failed to load models');
@@ -157,7 +183,6 @@ function App() {
 
   const switchModel = async (modelName) => {
     try {
-      await axios.post(`${process.env.REACT_APP_LLM_URL || 'http://localhost:5003'}/models/${modelName}/switch`);
       setSelectedModel(modelName);
       addLog(`🔄 Switched to ${modelName} model`);
     } catch (error) {
@@ -245,9 +270,17 @@ function App() {
         character: selectedCharacter
       };
       
+      // Determine which service to use based on selected model
+      let llmServiceUrl;
+      if (selectedModel === 'tinyllama') {
+        llmServiceUrl = 'http://localhost:5004';
+      } else {
+        llmServiceUrl = process.env.REACT_APP_LLM_URL || 'http://localhost:5003';
+      }
+      
       // Store the exact request being sent to LLM
       setLastLLMRequest({
-        url: `${process.env.REACT_APP_LLM_URL || 'http://localhost:5003'}/chat`,
+        url: `${llmServiceUrl}/chat`,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         payload: llmRequestData,
@@ -260,7 +293,8 @@ function App() {
         ...llmRequestData,
         model: selectedModel
       };
-      const llmResponse = await axios.post(`${process.env.REACT_APP_LLM_URL || 'http://localhost:5003'}/chat`, llmRequestDataWithModel);
+      
+      const llmResponse = await axios.post(`${llmServiceUrl}/chat`, llmRequestDataWithModel);
       const llmLatency = Date.now() - llmStartTime;
       
              // Store the complete LLM response for RAG explainability
@@ -431,8 +465,8 @@ function App() {
     <div className="app unified-mode">
       {/* Top Bar */}
       <header className="top-bar">
-        <div className="top-bar-left">
-          <h1 className="app-title">Star Wars LLM Chat – Debug Console</h1>
+                 <div className="top-bar-left">
+           <h1 className="app-title">LLM Command Console</h1>
           <div className={`connection-status ${connectionStatus}`}>
             {connectionStatus === 'healthy' ? '🟢 All Systems Operational' : '🔴 System Error'}
           </div>
@@ -589,14 +623,13 @@ function App() {
               >
                 {isMuted ? '🔇' : '🔊'}
               </button>
-              {explainabilityData && (
-                <button
-                  className="explainability-button"
-                  onClick={openExplainability}
-                >
-                  🔍 Explain
-                </button>
-              )}
+              <button
+                className="explainability-button"
+                onClick={openExplainability}
+                disabled={!explainabilityData}
+              >
+                🔍 Explain
+              </button>
             </div>
           </div>
         </div>

@@ -11,7 +11,7 @@ openai-whisper==20231117
 TTS==0.22.0
 
 # LLM and AI
-transformers==4.30.2
+transformers==4.33.0
 accelerate==0.20.3
 sentencepiece==0.1.99
 safetensors==0.3.1
@@ -23,7 +23,7 @@ llama-cpp-python==0.2.11
 # --index-url https://download.pytorch.org/whl/cpu
 
 # Data processing
-pandas==2.0.3
+pandas==1.5.3
 numpy==1.22.0
 
 # Embeddings and similarity
