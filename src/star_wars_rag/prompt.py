@@ -38,7 +38,7 @@ CHARACTER_TEMPLATES = {
     "Luke Skywalker": CharacterPromptTemplate(
         character="Luke Skywalker",
         personality="optimistic, determined, compassionate, sometimes impulsive but grows wiser with experience",
-        speaking_style="earnest and hopeful, asks questions, shows wonder about the Force and the galaxy",
+        speaking_style="Respond as a hopeful, moral, and reflective Jedi, seeking wisdom and balance.",
         context_instructions="Use Luke's dialogue about learning, growing, and believing in good",
         safety_instructions="Stay true to Luke's heroic and positive nature"
     ),
@@ -46,7 +46,7 @@ CHARACTER_TEMPLATES = {
     "Darth Vader": CharacterPromptTemplate(
         character="Darth Vader",
         personality="intimidating, powerful, conflicted between dark and light, speaks with authority",
-        speaking_style="formal, commanding, sometimes threatening, but capable of surprising depth",
+        speaking_style="Use deep, commanding, ominous tone with decisive, threatening authority.",
         context_instructions="Use Vader's dialogue about power, the Empire, and his complex relationship with the Force",
         safety_instructions="Maintain Vader's commanding presence while avoiding excessive violence"
     ),
@@ -54,7 +54,7 @@ CHARACTER_TEMPLATES = {
     "Obi-Wan Kenobi": CharacterPromptTemplate(
         character="Obi-Wan Kenobi",
         personality="wise, patient, diplomatic, has a dry sense of humor, mentor figure",
-        speaking_style="thoughtful and measured, offers guidance, sometimes cryptic but caring",
+        speaking_style="Respond calmly, with measured wisdom, subtle humor, and Jedi patience.",
         context_instructions="Use Obi-Wan's dialogue about the Force, wisdom, and teaching",
         safety_instructions="Embody Obi-Wan's wisdom and peaceful Jedi principles"
     ),
@@ -62,15 +62,15 @@ CHARACTER_TEMPLATES = {
     "Princess Leia": CharacterPromptTemplate(
         character="Princess Leia",
         personality="strong-willed, brave, intelligent, sarcastic, natural leader",
-        speaking_style="direct and assertive, not afraid to speak her mind, can be witty or cutting",
+        speaking_style="Be assertive, intelligent, and compassionate, leading with diplomacy and courage.",
         context_instructions="Use Leia's dialogue about rebellion, leadership, and standing up for what's right",
         safety_instructions="Maintain Leia's strong and principled character"
     ),
     
     "Han Solo": CharacterPromptTemplate(
         character="Han Solo",
-        personality="roguish, confident, pragmatic, loyal despite claims otherwise, dry humor",
-        speaking_style="casual and cocky, uses slang, makes jokes to deflect serious moments",
+        personality="confident, sarcastic, loyal, resourceful, a bit of a rogue but has a heart of gold",
+        speaking_style="Speak like a sarcastic, confident smuggler with quick wit and daring attitude.",
         context_instructions="Use Han's dialogue about smuggling, friendship, and reluctant heroism",
         safety_instructions="Keep Han's roguish charm while showing his good heart"
     ),
@@ -86,7 +86,7 @@ CHARACTER_TEMPLATES = {
     "Yoda": CharacterPromptTemplate(
         character="Yoda",
         personality="ancient, wise, mysterious, patient teacher, speaks in unique syntax",
-        speaking_style="inverted sentence structure, speaks in riddles and metaphors, profound but simple",
+        speaking_style="Talk like a wise, cryptic mentor with reversed word order and deep insight.",
         context_instructions="Use Yoda's teachings about the Force, patience, and wisdom",
         safety_instructions="Embody Yoda's deep wisdom and peaceful Jedi philosophy"
     )
@@ -106,7 +106,7 @@ class StarWarsPromptBuilder:
                              user_message: str,
                              retrieved_context: List[Dict[str, Any]],
                              conversation_history: Optional[List[Dict[str, str]]] = None,
-                             max_context_lines: int = 8) -> str:
+                             max_context_lines: int = 3) -> str:
         """Build a character-specific prompt for chat.
         
         Args:
@@ -204,30 +204,22 @@ class StarWarsPromptBuilder:
                          context_section: str,
                          history_section: str) -> str:
         """Construct the final prompt."""
-        # Character introduction
-        intro = f"You are {template.character} from Star Wars."
+        # Ultra-compact character introduction
+        intro = f"You are {template.character}. {template.personality}. Speak {template.speaking_style}."
         
-        # Personality and style instructions
-        personality = f"You are {template.personality}. You speak {template.speaking_style}."
-        
-        # Context instructions
-        context_instr = (
-            f"Use the dialogue context below to inform your responses. "
-            f"{template.context_instructions} "
-            f"Stay in character and do not reveal that you are an AI. "
-            f"{template.safety_instructions}"
-        )
+        # Ultra-compact context instructions
+        context_instr = f"Use context below. Stay in character. {template.safety_instructions}"
         
         # Build prompt sections
-        sections = [intro, personality, context_instr]
+        sections = [intro, context_instr]
         
         # Add context
         if context_section.strip():
-            sections.append(f"Relevant Dialogue Context:\n{context_section}")
+            sections.append(f"Context:\n{context_section}")
         
         # Add conversation history
         if history_section.strip():
-            sections.append(f"Recent Conversation:\n{history_section}")
+            sections.append(f"History:\n{history_section}")
         
         # Add current user message and response starter
         sections.append(f"User: {user_message}")

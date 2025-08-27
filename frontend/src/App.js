@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { Container, Row, Col, Card, Button, Form, Badge, Alert, Spinner, Modal, Navbar, Nav, Dropdown, ButtonGroup } from 'react-bootstrap';
+import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 
 function App() {
@@ -24,11 +26,51 @@ function App() {
   const [explainabilityData, setExplainabilityData] = useState(null);
   const [selectedModel, setSelectedModel] = useState('phi-2');
   const [availableModels, setAvailableModels] = useState({});
+  const [userInput, setUserInput] = useState('');
+  const [showSidebar, setShowSidebar] = useState(false);
+  
+  // Character statistics from the processed data
+  const characterStats = {
+    "Luke Skywalker": 443,
+    "Darth Vader": 127,
+    "Yoda": 58,
+    "Han Solo": 427,
+    "Princess Leia": 241,
+    "Obi-Wan Kenobi": 109,
+    "C-3PO": 269,
+    "R2-D2": 12,
+    "Chewbacca": 17,
+    "Lando": 111,
+    "Emperor Palpatine": 24,
+    "Grand Moff Tarkin": 24
+  };
+  
+  // Calculate total movie lines
+  const totalMovieLines = Object.values(characterStats).reduce((sum, count) => sum + count, 0);
+  
+  // Available models
+  const models = {
+    'phi-2': {
+      name: 'Phi-2',
+      description: 'Microsoft Phi-2 (2.7B parameters)',
+      port: 5003,
+      icon: '🤖',
+      color: '#4A90E2'
+    },
+    'tinyllama': {
+      name: 'TinyLlama',
+      description: 'TinyLlama (1.1B parameters)',
+      port: 5004,
+      icon: '⚡',
+      color: '#27AE60'
+    }
+  };
   
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const audioRef = useRef(null);
   const waveformRef = useRef(null);
+  const messagesEndRef = useRef(null);
 
   const characters = [
     { 
@@ -38,7 +80,7 @@ function App() {
       voice: 'en-us',
       speed: 1.2,
       personality: 'Optimistic, brave, determined, and committed to doing what\'s right. He believes in the Force and the power of good.',
-      speaking_style: 'Speaks with hope and determination. Uses phrases like \'The Force is with us\' and \'I believe in the Force.\''
+      speaking_style: 'Respond as a hopeful, moral, and reflective Jedi, seeking wisdom and balance.'
     },
     { 
       name: 'Darth Vader', 
@@ -47,7 +89,7 @@ function App() {
       voice: 'en',
       speed: 0.8,
       personality: 'Intimidating, commanding, conflicted, and powerful. He is both feared and respected.',
-      speaking_style: 'Speaks with authority and menace. Uses phrases like \'I find your lack of faith disturbing\' and \'The Force is strong with this one.\''
+      speaking_style: 'Use deep, commanding, ominous tone with decisive, threatening authority.'
     },
     { 
       name: 'Yoda', 
@@ -56,7 +98,7 @@ function App() {
       voice: 'en-gb',
       speed: 0.7,
       personality: 'Wise, patient, philosophical, and deeply connected to the Force. He speaks in a unique, backwards manner.',
-      speaking_style: 'Speaks in a distinctive backwards word order. Uses phrases like \'Do or do not, there is no try\' and \'The Force is strong with you.\''
+      speaking_style: 'Talk like a wise, cryptic mentor with reversed word order and deep insight.'
     },
     { 
       name: 'Han Solo', 
@@ -65,7 +107,7 @@ function App() {
       voice: 'en-au',
       speed: 1.1,
       personality: 'Confident, sarcastic, loyal, and resourceful. He\'s a bit of a rogue but has a heart of gold.',
-      speaking_style: 'Speaks with confidence and sarcasm. Uses phrases like \'I know\' and \'Great, kid! Don\'t get cocky.\''
+      speaking_style: 'Speak like a sarcastic, confident smuggler with quick wit and daring attitude.'
     },
     { 
       name: 'Princess Leia', 
@@ -74,7 +116,7 @@ function App() {
       voice: 'en-gb',
       speed: 1.0,
       personality: 'Strong-willed, intelligent, courageous, and determined. She\'s a natural leader and diplomat.',
-      speaking_style: 'Speaks with authority and intelligence. Uses phrases like \'Help me, Obi-Wan Kenobi\' and \'I love you.\''
+      speaking_style: 'Be assertive, intelligent, and compassionate, leading with diplomacy and courage.'
     },
     { 
       name: 'Obi-Wan Kenobi', 
@@ -82,759 +124,537 @@ function App() {
       color: '#3498db',
       voice: 'en-gb',
       speed: 0.9,
-      personality: 'Wise, patient, diplomatic, and deeply knowledgeable about the Force and Jedi ways.',
-      speaking_style: 'Speaks with wisdom and calm authority. Uses phrases like \'The Force will be with you, always\' and \'These aren\'t the droids you\'re looking for.\''
+      personality: 'Wise, patient, diplomatic, has a dry sense of humor, mentor figure',
+      speaking_style: 'Respond calmly, with measured wisdom, subtle humor, and Jedi patience.'
     }
   ];
 
-  // Check service health on component mount
+  const selectedCharacterData = characters.find(char => char.name === selectedCharacter);
+
+  // Auto-scroll to bottom of messages
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
   useEffect(() => {
-    checkServiceHealth();
-    loadAvailableModels();
-    const interval = setInterval(checkServiceHealth, 30000); // Check every 30 seconds
+    scrollToBottom();
+  }, [messages]);
+
+  // Health check
+  useEffect(() => {
+    const checkHealth = async () => {
+      try {
+        const response = await axios.get('http://localhost:5003/health');
+        setConnectionStatus('healthy');
+      } catch (error) {
+        setConnectionStatus('error');
+      }
+    };
+    checkHealth();
+    const interval = setInterval(checkHealth, 30000);
     return () => clearInterval(interval);
   }, []);
 
-  // Clear chat when character changes
-  useEffect(() => {
-    setMessages([]);
-    setLastRequestData(null);
-    setLastLLMRequest(null);
-    setLastLLMResponse(null);
-    setRagContext([]);
-    setSystemPrompt('');
-    setLiveTranscription('');
-    setTtsProgress(0);
-    setIsTtsPlaying(false);
-    setExplainabilityData(null);
-    addLog(`Character changed to ${selectedCharacter}`);
-  }, [selectedCharacter]);
+  const sendMessage = async () => {
+    if (!userInput.trim() || isProcessing) return;
 
-  const checkServiceHealth = async () => {
-    try {
-      const services = [
-        { name: 'STT', url: `${process.env.REACT_APP_STT_URL || 'http://localhost:5001'}/health` },
-        { name: 'TTS', url: `${process.env.REACT_APP_TTS_URL || 'http://localhost:5002'}/health` },
-        { name: 'LLM', url: `${process.env.REACT_APP_LLM_URL || 'http://localhost:5003'}/health` }
-      ];
-
-      const healthChecks = await Promise.allSettled(
-        services.map(service => axios.get(service.url, { timeout: 5000 }))
-      );
-
-      const allHealthy = healthChecks.every(result => result.status === 'fulfilled');
-      setConnectionStatus(allHealthy ? 'healthy' : 'error');
-      
-      if (!allHealthy) {
-        addLog('⚠️ Some services are not responding');
-      }
-    } catch (error) {
-      setConnectionStatus('error');
-      addLog('❌ Health check failed');
-    }
-  };
-
-  const addLog = (message) => {
-    const timestamp = new Date().toLocaleTimeString();
-    setLogs(prev => [...prev.slice(-9), `${timestamp}: ${message}`]);
-  };
-
-  const loadAvailableModels = async () => {
-    try {
-      // Check both LLM services
-      const [phi2Response, tinyllamaResponse] = await Promise.allSettled([
-        axios.get(`${process.env.REACT_APP_LLM_URL || 'http://localhost:5003'}/models`),
-        axios.get('http://localhost:5004/models')
-      ]);
-
-      const allModels = {};
-
-      // Add Phi-2 models if available
-      if (phi2Response.status === 'fulfilled') {
-        const phi2Models = phi2Response.value.data.available_models || {};
-        Object.assign(allModels, phi2Models);
-        addLog('✅ Phi-2 models loaded');
-      } else {
-        addLog('❌ Phi-2 service unavailable');
-      }
-
-      // Add TinyLlama models if available
-      if (tinyllamaResponse.status === 'fulfilled') {
-        const tinyllamaModels = tinyllamaResponse.value.data.available_models || {};
-        Object.assign(allModels, tinyllamaModels);
-        addLog('✅ TinyLlama models loaded');
-      } else {
-        addLog('❌ TinyLlama service unavailable');
-      }
-
-      setAvailableModels(allModels);
-      
-      // Set default model if available
-      if (Object.keys(allModels).length > 0) {
-        setSelectedModel(Object.keys(allModels)[0]);
-      }
-      
-      addLog(`🤖 ${Object.keys(allModels).length} models loaded successfully`);
-    } catch (error) {
-      console.error('Error loading models:', error);
-      addLog('❌ Failed to load models');
-    }
-  };
-
-  const switchModel = async (modelName) => {
-    try {
-      setSelectedModel(modelName);
-      addLog(`🔄 Switched to ${modelName} model`);
-    } catch (error) {
-      console.error('Error switching model:', error);
-      addLog('❌ Failed to switch model');
-    }
-  };
-
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorderRef.current = new MediaRecorder(stream);
-      audioChunksRef.current = [];
-
-      mediaRecorderRef.current.ondataavailable = (event) => {
-        audioChunksRef.current.push(event.data);
-      };
-
-      mediaRecorderRef.current.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
-        await processAudio(audioBlob);
-      };
-
-      mediaRecorderRef.current.start();
-      setIsRecording(true);
-      setLiveTranscription('🎤 Recording...');
-      addLog('🎤 Recording started');
-    } catch (error) {
-      console.error('Error starting recording:', error);
-      addLog('❌ Failed to start recording');
-      alert('Error accessing microphone. Please check permissions.');
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
-      setIsRecording(false);
-      setLiveTranscription('');
-      addLog('⏹️ Recording stopped');
-    }
-  };
-
-  const processAudio = async (audioBlob) => {
-    const startTime = Date.now();
+    const userMessage = userInput.trim();
+    setUserInput('');
     setIsProcessing(true);
-    addLog('🔄 Processing audio...');
-    
+
+    // Add user message
+    const newUserMessage = {
+      id: Date.now(),
+      type: 'user',
+      content: userMessage,
+      timestamp: new Date().toLocaleTimeString()
+    };
+    setMessages(prev => [...prev, newUserMessage]);
+
     try {
-      // Step 1: Send audio to STT service
-      const sttStartTime = Date.now();
-      const formData = new FormData();
-      formData.append('file', audioBlob, 'audio.wav');
-      
-      const sttResponse = await axios.post(`${process.env.REACT_APP_STT_URL || 'http://localhost:5001'}/transcribe`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      const selectedModelData = models[selectedModel];
+      const response = await axios.post(`http://localhost:${selectedModelData.port}/chat`, {
+        character: selectedCharacter,
+        message: userMessage,
+        session_id: 'test-session'
       });
-      
-      const sttLatency = Date.now() - sttStartTime;
-      const transcription = sttResponse.data.text;
-      addLog(`🎯 STT completed in ${sttLatency}ms: "${transcription}"`);
-      
-      // Add user message
-      const userMessage = { type: 'user', text: transcription, timestamp: new Date() };
-      setMessages(prev => [...prev, userMessage]);
-      
-      // Process with LLM
-      await processWithLLM(transcription, startTime, sttLatency);
-      
+
+      const characterMessage = {
+        id: Date.now() + 1,
+        type: 'character',
+        content: response.data.response,
+        timestamp: new Date().toLocaleTimeString(),
+        character: selectedCharacter
+      };
+      setMessages(prev => [...prev, characterMessage]);
+
+      // Update RAG context if available
+      if (response.data.rag_context) {
+        setRagContext(response.data.rag_context);
+      }
+
+      // Store explainability data
+      setExplainabilityData(response.data);
+
     } catch (error) {
-      console.error('Error processing audio:', error);
-      addLog('❌ Audio processing failed');
-      alert('Error processing your message. Please try again.');
+      console.error('Error sending message:', error);
+      const errorMessage = {
+        id: Date.now() + 1,
+        type: 'error',
+        content: 'Sorry, I encountered an error. Please try again.',
+        timestamp: new Date().toLocaleTimeString()
+      };
+      setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const processWithLLM = async (text, startTime, sttLatency = 0) => {
-    try {
-      // Prepare LLM request data
-      const llmRequestData = {
-        message: text,
-        character: selectedCharacter
-      };
-      
-      // Determine which service to use based on selected model
-      let llmServiceUrl;
-      if (selectedModel === 'tinyllama') {
-        llmServiceUrl = 'http://localhost:5004';
-      } else {
-        llmServiceUrl = process.env.REACT_APP_LLM_URL || 'http://localhost:5003';
-      }
-      
-      // Store the exact request being sent to LLM
-      setLastLLMRequest({
-        url: `${llmServiceUrl}/chat`,
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        payload: llmRequestData,
-        timestamp: new Date().toISOString()
-      });
-      
-      // Step 2: Send text to LLM service
-      const llmStartTime = Date.now();
-      const llmRequestDataWithModel = {
-        ...llmRequestData,
-        model: selectedModel
-      };
-      
-      const llmResponse = await axios.post(`${llmServiceUrl}/chat`, llmRequestDataWithModel);
-      const llmLatency = Date.now() - llmStartTime;
-      
-             // Store the complete LLM response for RAG explainability
-       setLastLLMResponse(llmResponse.data);
-       setRagContext(llmResponse.data.rag_context || []);
-       setSystemPrompt(llmResponse.data.complete_prompt || '');
-       
-       // Store request data for context panel
-       setLastRequestData({
-         stt_latency: sttLatency,
-         embedding_latency: llmResponse.data.embedding_latency || 0,
-         llm_latency: llmLatency,
-         tts_latency: 0, // Will be updated after TTS
-         total_latency: Date.now() - startTime
-       });
-      
-      // Set explainability data
-      setExplainabilityData({
-        userMessage: text,
-        character: selectedCharacter,
-        ragContext: llmResponse.data.rag_context || [],
-        systemPrompt: llmResponse.data.complete_prompt || '',
-        llmResponse: llmResponse.data.response,
-        performance: {
-          stt: sttLatency,
-          llm: llmLatency,
-          total: Date.now() - startTime
-        },
-        timestamp: new Date().toISOString()
-      });
-      
-      const characterResponse = llmResponse.data.response;
-      addLog(`🤖 LLM response in ${llmLatency}ms`);
-      
-      // Add character response
-      const characterMessage = { type: 'character', text: characterResponse, timestamp: new Date() };
-      setMessages(prev => [...prev, characterMessage]);
-      
-      // Step 3: Convert response to speech
-      const ttsStartTime = Date.now();
-      const characterData = getSelectedCharacterData();
-      const ttsResponse = await axios.post(`${process.env.REACT_APP_TTS_URL || 'http://localhost:5002'}/synthesize`, {
-        text: characterResponse,
-        voice: characterData?.voice || 'en',
-        speed: characterData?.speed || 1.0
-      });
-             const ttsLatency = Date.now() - ttsStartTime;
-       addLog(`🔊 TTS generated in ${ttsLatency}ms`);
-       
-       // Update request data with TTS latency
-       setLastRequestData(prev => prev ? {
-         ...prev,
-         tts_latency: ttsLatency
-       } : null);
-      
-      // Update performance metrics
-      const totalLatency = Date.now() - startTime;
-      setPerformanceMetrics({
-        stt: sttLatency,
-        llm: llmLatency,
-        tts: ttsLatency,
-        total: totalLatency,
-        tokensPerSec: characterResponse.length / (llmLatency / 1000)
-      });
-      
-      // Play the audio response (unless muted)
-      if (!isMuted) {
-        const audioFilename = ttsResponse.data.audio_file.split('/').pop();
-        const audioUrl = `${process.env.REACT_APP_TTS_URL || 'http://localhost:5002'}/audio/${audioFilename}`;
-        const audio = new Audio(audioUrl);
-        audioRef.current = audio;
-        
-        // Set up audio progress tracking
-        audio.addEventListener('timeupdate', () => {
-          const progress = (audio.currentTime / audio.duration) * 100;
-          setTtsProgress(progress);
-        });
-        
-        audio.addEventListener('play', () => {
-          setIsTtsPlaying(true);
-        });
-        
-        audio.addEventListener('ended', () => {
-          setIsTtsPlaying(false);
-          setTtsProgress(0);
-        });
-        
-        audio.play();
-        addLog('🔊 Playing audio response');
-      } else {
-        addLog('🔇 Audio muted');
-      }
-      
-    } catch (error) {
-      console.error('Error processing with LLM:', error);
-      addLog('❌ LLM processing failed');
-      alert('Error processing your message. Please try again.');
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
     }
   };
 
-  const sendTextMessage = async () => {
-    const textInput = document.getElementById('text-input');
-    const text = textInput.value.trim();
-    
-    if (!text) return;
-    
-    textInput.value = '';
-    
-    // Add user message
-    const userMessage = { type: 'user', text, timestamp: new Date() };
-    setMessages(prev => [...prev, userMessage]);
-    
-    const startTime = Date.now();
-    await processWithLLM(text, startTime);
+  const clearChat = () => {
+    setMessages([]);
+    setRagContext([]);
+    setExplainabilityData(null);
   };
 
-  const exportConversation = () => {
-    const exportData = {
-      timestamp: new Date().toISOString(),
-      character: selectedCharacter,
-      characterData: getSelectedCharacterData(),
-      messages: messages,
-      debug: {
-        lastRequest: lastLLMRequest,
-        lastResponse: lastLLMResponse,
-        performanceMetrics: performanceMetrics,
-        ragContext: ragContext,
-        systemPrompt: systemPrompt,
-        explainabilityData: explainabilityData
-      }
-    };
-    
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `star-wars-chat-${selectedCharacter}-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    addLog('💾 Conversation exported');
-  };
-
-  const toggleMute = () => {
-    setIsMuted(!isMuted);
-    if (audioRef.current) {
-      if (isMuted) {
-        audioRef.current.play();
-      } else {
-        audioRef.current.pause();
-      }
-    }
-    addLog(isMuted ? '🔊 Audio unmuted' : '🔇 Audio muted');
-  };
-
-  const getSelectedCharacterData = () => {
-    return characters.find(char => char.name === selectedCharacter);
-  };
-
-  const openExplainability = () => {
-    if (explainabilityData) {
-      setShowExplainability(true);
+  const getConnectionStatusBadge = () => {
+    switch (connectionStatus) {
+      case 'healthy':
+        return <Badge bg="success">🟢 Connected</Badge>;
+      case 'error':
+        return <Badge bg="danger">🔴 Error</Badge>;
+      default:
+        return <Badge bg="warning">🟡 Checking...</Badge>;
     }
   };
 
   return (
-    <div className="app unified-mode">
-      {/* Top Bar */}
-      <header className="top-bar">
-                 <div className="top-bar-left">
-           <h1 className="app-title">LLM Command Console</h1>
-          <div className={`connection-status ${connectionStatus}`}>
-            {connectionStatus === 'healthy' ? '🟢 All Systems Operational' : '🔴 System Error'}
-          </div>
-        </div>
-      </header>
-
-      <div className="main-content">
-        {/* Left Column - Movie Lines */}
-        <div className="left-panel">
-          <div className="panel-header">
-            <h3>🎬 Movie Lines Retrieved</h3>
-          </div>
-          <div className="movie-lines-panel">
-                         {ragContext.length > 0 ? (
-               ragContext.map((line, index) => (
-                 <div key={index} className="movie-line-item">
-                   <div className="movie-line-header">
-                     <span className="movie-title">{line.movie_title || line.movie || 'Star Wars'}</span>
-                     <span className="relevance-score">Score: {line.similarity_score?.toFixed(3) || line.score?.toFixed(3) || 'N/A'}</span>
-                   </div>
-                   <div className="movie-dialogue">
-                     <strong>{line.character}:</strong> {line.dialogue}
-                   </div>
-                 </div>
-               ))
-             ) : (
-              <div className="empty-state">
-                <p>No movie lines retrieved yet. Send a message to see relevant dialogue!</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Middle Column - Chat */}
-        <div className="chat-panel">
-                     <div className="character-selector">
-             <h3>Choose Your Character</h3>
-             <div className="character-grid">
-               {characters.map(character => (
-                 <div
-                   key={character.name}
-                   className={`character-card ${selectedCharacter === character.name ? 'selected' : ''}`}
-                   onClick={() => setSelectedCharacter(character.name)}
-                   style={{ borderColor: character.color }}
-                 >
-                   <div className="character-emoji">{character.emoji}</div>
-                   <h4>{character.name}</h4>
-                 </div>
-               ))}
-             </div>
-           </div>
-
-           <div className="model-selector">
-             <h3>🤖 Choose Your Model</h3>
-             <div className="model-grid">
-               {Object.entries(availableModels).map(([key, model]) => (
-                 <div
-                   key={key}
-                   className={`model-card ${selectedModel === key ? 'selected' : ''}`}
-                   onClick={() => switchModel(key)}
-                 >
-                   <div className="model-icon">🤖</div>
-                   <h4>{model.name}</h4>
-                   <p className="model-description">{model.description}</p>
-                   <div className="model-specs">
-                     <span>Context: {model.context_length}</span>
-                     <span>Threads: {model.threads}</span>
-                   </div>
-                 </div>
-               ))}
-             </div>
-           </div>
-
-          <div className="messages-container">
-            {messages.map((message, index) => (
-              <div key={index} className={`message ${message.type}`}>
-                                 <div className="message-avatar">
-                   {message.type === 'user' ? (
-                     <div className="user-avatar">⚔️</div>
-                   ) : (
-                     <div className="character-avatar-small">🤖</div>
-                   )}
-                 </div>
-                <div className="message-content">
-                  <strong>{message.type === 'user' ? 'You' : selectedCharacter}:</strong>
-                  <p>{message.text}</p>
-                  <small>{message.timestamp.toLocaleTimeString()}</small>
-                </div>
-              </div>
-            ))}
-            {isProcessing && (
-              <div className="message processing">
-                <div className="message-content">
-                  <div className="processing-indicator">
-                    <span></span><span></span><span></span>
-                  </div>
-                  <p>Processing...</p>
-                </div>
-              </div>
-            )}
+    <div className="app">
+      {/* Navigation Bar */}
+      <Navbar bg="dark" variant="dark" expand="lg" className="border-bottom border-secondary">
+        <Container fluid>
+          <Navbar.Brand className="d-flex align-items-center">
+            <span className="me-2">⭐</span>
+            <span className="fw-bold">Star Wars Chat</span>
+          </Navbar.Brand>
+          
+          <div className="d-flex align-items-center me-3">
+            {getConnectionStatusBadge()}
           </div>
 
-          {/* Live Transcription */}
-          {liveTranscription && (
-            <div className="live-transcription">
-              <div className="transcription-content">
-                <span className="transcription-icon">🎤</span>
-                <span className="transcription-text">{liveTranscription}</span>
-                <div className="waveform" ref={waveformRef}>
-                  <span></span><span></span><span></span><span></span><span></span>
-                </div>
-              </div>
-            </div>
-          )}
+          <Navbar.Toggle 
+            aria-controls="sidebar-nav" 
+            onClick={() => setShowSidebar(!showSidebar)}
+            className="d-lg-none"
+          />
+          
+          <Navbar.Collapse id="sidebar-nav" className="justify-content-end">
+            <Nav className="ms-auto">
+              <Dropdown as={Nav.Item} className="me-2">
+                <Dropdown.Toggle as={Nav.Link} className="text-light">
+                  {selectedCharacterData?.emoji} {selectedCharacter}
+                </Dropdown.Toggle>
+                <Dropdown.Menu bg="dark" variant="dark">
+                  {characters.map(char => (
+                    <Dropdown.Item 
+                      key={char.name}
+                      onClick={() => setSelectedCharacter(char.name)}
+                      className={selectedCharacter === char.name ? 'active' : ''}
+                    >
+                      {char.emoji} {char.name}
+                    </Dropdown.Item>
+                  ))}
+                </Dropdown.Menu>
+              </Dropdown>
+              
+              <Dropdown as={Nav.Item}>
+                <Dropdown.Toggle as={Nav.Link} className="text-light">
+                  {models[selectedModel]?.icon} {models[selectedModel]?.name}
+                </Dropdown.Toggle>
+                <Dropdown.Menu bg="dark" variant="dark">
+                  {Object.entries(models).map(([key, model]) => (
+                    <Dropdown.Item 
+                      key={key}
+                      onClick={() => setSelectedModel(key)}
+                      className={selectedModel === key ? 'active' : ''}
+                    >
+                      {model.icon} {model.name}
+                    </Dropdown.Item>
+                  ))}
+                </Dropdown.Menu>
+              </Dropdown>
+            </Nav>
+          </Navbar.Collapse>
+        </Container>
+      </Navbar>
 
-          {/* TTS Progress Bar */}
-          {isTtsPlaying && (
-            <div className="tts-progress">
-              <div className="progress-bar">
-                <div 
-                  className="progress-fill" 
-                  style={{ width: `${ttsProgress}%` }}
-                ></div>
-              </div>
-              <span className="progress-text">🔊 Playing: {ttsProgress.toFixed(1)}%</span>
-            </div>
-          )}
-
-          <div className="input-section">
-            <div className="text-input-container">
-              <input
-                id="text-input"
-                type="text"
-                placeholder="Type your message..."
-                onKeyPress={(e) => e.key === 'Enter' && sendTextMessage()}
-                disabled={isProcessing}
-              />
-              <button onClick={sendTextMessage} disabled={isProcessing}>
-                Send
-              </button>
-            </div>
-            
-            <div className="voice-controls">
-              <button
-                className={`record-button ${isRecording ? 'recording' : ''}`}
-                onClick={isRecording ? stopRecording : startRecording}
-                disabled={isProcessing}
-              >
-                {isRecording ? '⏹️ Stop' : '🎤 Record'}
-              </button>
-              <button
-                className={`mute-button ${isMuted ? 'muted' : ''}`}
-                onClick={toggleMute}
-              >
-                {isMuted ? '🔇' : '🔊'}
-              </button>
-              <button
-                className="explainability-button"
-                onClick={openExplainability}
-                disabled={!explainabilityData}
-              >
-                🔍 Explain
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column - Context */}
-        <div className="right-panel">
-          <div className="panel-header">
-            <h3>📋 Context Sent to Model</h3>
-          </div>
-          <div className="context-panel">
-            {lastRequestData ? (
-              <div className="context-content">
-                <div className="context-section">
-                  <h4>🎭 Character Context</h4>
-                  <div className="character-context">
-                    <p><strong>Character:</strong> {selectedCharacter}</p>
-                    <p><strong>Personality:</strong> {getSelectedCharacterData()?.personality}</p>
-                    <p><strong>Speaking Style:</strong> {getSelectedCharacterData()?.speaking_style}</p>
-                  </div>
-                </div>
-
-                <div className="context-section">
-                  <h4>📝 System Prompt</h4>
-                  <div className="system-prompt">
-                    <pre>{systemPrompt || 'No system prompt available'}</pre>
-                  </div>
-                </div>
-
-                <div className="context-section">
-                  <h4>⚡ Performance Metrics</h4>
-                  <div className="performance-metrics">
-                    <div className="metric">
-                      <span>STT Latency:</span>
-                      <span>{lastRequestData?.stt_latency || 'N/A'} ms</span>
+      <Container fluid className="main-container">
+        <Row className="h-100">
+          {/* Sidebar - Hidden on mobile, shown on desktop */}
+          <Col lg={3} className={`sidebar ${showSidebar ? 'show' : ''} d-none d-lg-block`}>
+            <Card className="h-100 border-0 bg-dark text-light">
+              <Card.Header className="bg-secondary border-0">
+                <h5 className="mb-0">🎬 Movie Context</h5>
+              </Card.Header>
+              <Card.Body className="p-0">
+                <div className="rag-context-container">
+                  {ragContext.length > 0 ? (
+                    ragContext.map((line, index) => (
+                      <div key={index} className="rag-context-item">
+                        <div className="d-flex justify-content-between align-items-start mb-2">
+                          <small className="text-primary fw-bold">{line.movie_title || 'Star Wars'}</small>
+                          <Badge bg="secondary" className="fs-6">
+                            {(line.similarity_score || line.score || 0).toFixed(3)}
+                          </Badge>
+                        </div>
+                        <div className="rag-dialogue">
+                          <strong className="text-warning">{line.character}:</strong> {line.dialogue}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center text-muted p-4">
+                      <p className="mb-0">No context retrieved yet. Send a message to see relevant dialogue!</p>
                     </div>
-                    <div className="metric">
-                      <span>Embedding Query:</span>
-                      <span>{lastRequestData?.embedding_latency || 'N/A'} ms</span>
+                  )}
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+
+          {/* Main Chat Area */}
+          <Col lg={6} className="chat-area">
+            <Card className="h-100 border-0 bg-dark text-light">
+              <Card.Header className="bg-secondary border-0 d-flex justify-content-between align-items-center">
+                <div>
+                  <h5 className="mb-0">💬 Chat with {selectedCharacter}</h5>
+                  <small className="text-muted">
+                    {characterStats[selectedCharacter] || 0} total lines • {totalMovieLines} total movie lines
+                  </small>
+                </div>
+                <ButtonGroup size="sm">
+                  <Button variant="outline-light" onClick={clearChat}>
+                    🗑️ Clear
+                  </Button>
+                  <Button 
+                    variant={explainabilityData ? "outline-info" : "outline-secondary"} 
+                    onClick={() => setShowExplainability(true)}
+                    disabled={!explainabilityData}
+                  >
+                    🔍 Explain
+                  </Button>
+                </ButtonGroup>
+              </Card.Header>
+              
+              <Card.Body className="p-0 d-flex flex-column">
+                {/* Messages Container */}
+                <div className="messages-container flex-grow-1">
+                  {messages.length === 0 ? (
+                    <div className="text-center text-muted p-5">
+                      <h4>🌟 Welcome to Star Wars Chat!</h4>
+                      <p>Choose a character and start chatting to experience the magic of the Force.</p>
+                      <div className="character-grid mt-4">
+                        {characters.map(char => (
+                          <Button
+                            key={char.name}
+                            variant={selectedCharacter === char.name ? 'primary' : 'outline-secondary'}
+                            size="sm"
+                            className="m-1"
+                            onClick={() => setSelectedCharacter(char.name)}
+                          >
+                            {char.emoji} {char.name}
+                          </Button>
+                        ))}
+                      </div>
                     </div>
-                    <div className="metric">
-                      <span>LLM Response:</span>
-                      <span>{lastRequestData?.llm_latency || 'N/A'} ms</span>
+                  ) : (
+                    messages.map((message) => (
+                      <div key={message.id} className={`message ${message.type}`}>
+                        <div className={`message-bubble ${message.type}`}>
+                          <div className="message-content">
+                            {message.type === 'character' && (
+                              <div className="character-info mb-2">
+                                <span className="character-emoji">{selectedCharacterData?.emoji}</span>
+                                <span className="character-name">{message.character}</span>
+                              </div>
+                            )}
+                            {message.content}
+                          </div>
+                          <small className="message-time">{message.timestamp}</small>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                  {isProcessing && (
+                    <div className="message character">
+                      <div className="message-bubble character">
+                        <div className="d-flex align-items-center">
+                          <Spinner animation="border" size="sm" className="me-2" />
+                          <span>Thinking...</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="metric">
-                      <span>TTS Generation:</span>
-                      <span>{lastRequestData?.tts_latency || 'N/A'} ms</span>
-                    </div>
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                {/* Input Area */}
+                <div className="input-area p-3 border-top border-secondary">
+                  <Row className="g-2">
+                    <Col>
+                      <Form.Control
+                        as="textarea"
+                        rows={2}
+                        value={userInput}
+                        onChange={(e) => setUserInput(e.target.value)}
+                        onKeyPress={handleKeyPress}
+                        placeholder={`Message ${selectedCharacter}...`}
+                        className="bg-dark text-light border-secondary"
+                      />
+                    </Col>
+                    <Col xs="auto">
+                      <Button 
+                        variant="primary" 
+                        onClick={sendMessage}
+                        disabled={!userInput.trim() || isProcessing}
+                        className="h-100"
+                      >
+                        {isProcessing ? <Spinner animation="border" size="sm" /> : 'Send'}
+                      </Button>
+                    </Col>
+                  </Row>
+                  
+                  {/* Voice Controls */}
+                  <div className="voice-controls mt-2 d-flex justify-content-center gap-2">
+                    <Button 
+                      variant={isRecording ? 'danger' : 'outline-secondary'}
+                      size="sm"
+                      onClick={() => setIsRecording(!isRecording)}
+                    >
+                      {isRecording ? '⏹️ Stop' : '🎤 Record'}
+                    </Button>
+                    <Button 
+                      variant={isMuted ? 'secondary' : 'outline-secondary'}
+                      size="sm"
+                      onClick={() => setIsMuted(!isMuted)}
+                    >
+                      {isMuted ? '🔊 Unmute' : '🔇 Mute'}
+                    </Button>
                   </div>
                 </div>
+              </Card.Body>
+            </Card>
+          </Col>
 
-                                 <div className="context-section">
-                   <h4>🔧 Service Information</h4>
-                   <div className="service-info">
-                     <p><strong>🤖 LLM Model:</strong> GPT-4 (via OpenAI API)</p>
-                     <p><strong>🎤 STT Service:</strong> Whisper (OpenAI)</p>
-                     <p><strong>🔊 TTS Service:</strong> ElevenLabs</p>
-                     <p><strong>🔍 RAG Database:</strong> PostgreSQL + pgvector</p>
-                   </div>
-                 </div>
+          {/* Info Panel - Hidden on mobile, shown on desktop */}
+          <Col lg={3} className="info-panel d-none d-lg-block">
+            <Card className="h-100 border-0 bg-dark text-light">
+              <Card.Header className="bg-secondary border-0">
+                <h5 className="mb-0">⚙️ System Info</h5>
+              </Card.Header>
+              <Card.Body>
+                <div className="info-section mb-3">
+                  <h6 className="text-primary">Character Info</h6>
+                  <p className="mb-1"><strong>Name:</strong> {selectedCharacter}</p>
+                  <p className="mb-1"><strong>Personality:</strong> {selectedCharacterData?.personality}</p>
+                  <p className="mb-0"><strong>Style:</strong> {selectedCharacterData?.speaking_style}</p>
+                </div>
 
-                 <div className="context-section">
-                   <h4>📋 System Logs</h4>
-                   <div className="logs-container">
-                     {logs.map((log, index) => (
-                       <div key={index} className="log-entry">
-                         {log}
-                       </div>
-                     ))}
-                   </div>
-                 </div>
-              </div>
-            ) : (
-              <div className="empty-state">
-                <p>No context available yet. Send a message to see what was sent to the model!</p>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+                <div className="info-section mb-3">
+                  <h6 className="text-primary">Model Info</h6>
+                  <p className="mb-1"><strong>Model:</strong> {models[selectedModel]?.name}</p>
+                  <p className="mb-1"><strong>Description:</strong> {models[selectedModel]?.description}</p>
+                  <p className="mb-0"><strong>Port:</strong> {models[selectedModel]?.port}</p>
+                </div>
 
-             {/* Footer */}
-       <footer className="app-footer">
-         <div className="footer-left">
-           <span className="build-version">Build: {buildVersion}</span>
-         </div>
-         <div className="footer-center">
-           <div className="metrics-footer">
-             <div className="metric-item">
-               <span className="metric-label">🤖 LLM:</span>
-               <span className="metric-value">{performanceMetrics.llm || 0}ms</span>
-             </div>
-             <div className="metric-item">
-               <span className="metric-label">🎤 STT:</span>
-               <span className="metric-value">{performanceMetrics.stt || 0}ms</span>
-             </div>
-             <div className="metric-item">
-               <span className="metric-label">🔊 TTS:</span>
-               <span className="metric-value">{performanceMetrics.tts || 0}ms</span>
-             </div>
-             <div className="metric-item">
-               <span className="metric-label">⚡ Total:</span>
-               <span className="metric-value">{performanceMetrics.total || 0}ms</span>
-             </div>
-             <div className="metric-item">
-               <span className="metric-label">📊 Tokens/sec:</span>
-               <span className="metric-value">{performanceMetrics.tokensPerSec ? performanceMetrics.tokensPerSec.toFixed(1) : 0}</span>
-             </div>
-           </div>
-         </div>
-         <div className="footer-right">
-           <button className="export-button" onClick={exportConversation}>
-             💾 Export Conversation
-           </button>
-         </div>
-       </footer>
+                <div className="info-section mb-3">
+                  <h6 className="text-primary">Performance</h6>
+                  <p className="mb-1"><strong>Messages:</strong> {messages.length}</p>
+                  <p className="mb-1"><strong>Context Lines:</strong> {ragContext.length}</p>
+                  <p className="mb-0"><strong>Status:</strong> {connectionStatus}</p>
+                </div>
+
+                <div className="info-section mb-3">
+                  <h6 className="text-primary">Database Stats</h6>
+                  <p className="mb-1"><strong>Character Lines:</strong> {characterStats[selectedCharacter] || 0}</p>
+                  <p className="mb-1"><strong>Total Movie Lines:</strong> {totalMovieLines}</p>
+                  <p className="mb-0"><strong>Characters Available:</strong> {Object.keys(characterStats).length}</p>
+                </div>
+
+                <div className="info-section">
+                  <h6 className="text-primary">Build Info</h6>
+                  <p className="mb-0"><strong>Version:</strong> {buildVersion}</p>
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+      </Container>
 
       {/* Explainability Modal */}
-      {showExplainability && explainabilityData && (
-        <div className="modal-overlay" onClick={() => setShowExplainability(false)}>
-          <div className="explainability-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>🔍 AI Explainability Report</h2>
-              <button className="close-button" onClick={() => setShowExplainability(false)}>
-                ✕
-              </button>
-            </div>
-            
-            <div className="modal-content">
-              <div className="explainability-section">
-                <h3>💬 User Input</h3>
-                <p className="user-input">{explainabilityData.userMessage}</p>
-              </div>
-
-              <div className="explainability-section">
-                <h3>🎭 Character Context</h3>
-                <div className="character-context">
-                  <p><strong>Character:</strong> {explainabilityData.character}</p>
-                  <p><strong>Personality:</strong> {getSelectedCharacterData()?.personality}</p>
-                  <p><strong>Speaking Style:</strong> {getSelectedCharacterData()?.speaking_style}</p>
+      <Modal 
+        show={showExplainability} 
+        onHide={() => setShowExplainability(false)}
+        size="xl"
+        className="explainability-modal"
+      >
+        <Modal.Header closeButton className="bg-dark text-light">
+          <Modal.Title>🔍 AI Explainability Report</Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="bg-dark text-light">
+          {explainabilityData && (
+            <div>
+              {/* User Input Section */}
+              <div className="explainability-section mb-4">
+                <h6 className="text-primary mb-3">💬 User Input</h6>
+                <div className="bg-secondary p-3 rounded">
+                  <p className="mb-0">{explainabilityData.request_data?.message || 'No user input available'}</p>
                 </div>
               </div>
 
-              <div className="explainability-section">
-                <h3>🎬 Retrieved Movie Lines ({explainabilityData.ragContext.length} results)</h3>
-                <div className="movie-lines">
-                  {explainabilityData.ragContext.map((context, index) => (
-                    <div key={index} className="movie-line">
-                      <div className="movie-line-header">
-                        <span className="movie-title">{context.movie_title}</span>
-                        <span className="scene-info">{context.scene_info}</span>
-                        <span className="relevance-score">Relevance: {context.similarity_score ? context.similarity_score.toFixed(3) : 'N/A'}</span>
+              {/* Character Context Section */}
+              <div className="explainability-section mb-4">
+                <h6 className="text-primary mb-3">🎭 Character Context</h6>
+                <div className="bg-secondary p-3 rounded">
+                  <p className="mb-1"><strong>Character:</strong> {explainabilityData.request_data?.character}</p>
+                  <p className="mb-1"><strong>Personality:</strong> {selectedCharacterData?.personality}</p>
+                  <p className="mb-1"><strong>Speaking Style:</strong> {selectedCharacterData?.speaking_style}</p>
+                  <p className="mb-0"><strong>Model Used:</strong> {models[selectedModel]?.name} ({models[selectedModel]?.description})</p>
+                </div>
+              </div>
+
+              {/* RAG Context Section */}
+              <div className="explainability-section mb-4">
+                <h6 className="text-primary mb-3">🎬 Retrieved Movie Lines ({explainabilityData.rag_context?.length || 0} results)</h6>
+                <div className="rag-context-modal">
+                  {explainabilityData.rag_context && explainabilityData.rag_context.length > 0 ? (
+                    explainabilityData.rag_context.map((context, index) => (
+                      <div key={index} className="rag-context-item-modal mb-3">
+                        <div className="d-flex justify-content-between align-items-start mb-2">
+                          <span className="text-warning fw-bold">{context.movie_title || 'Star Wars'}</span>
+                          <Badge bg="secondary">Score: {(context.similarity_score || context.score || 0).toFixed(3)}</Badge>
+                        </div>
+                        <div className="bg-secondary p-2 rounded">
+                          <strong className="text-primary">{context.character}:</strong> "{context.dialogue}"
+                        </div>
+                        {context.scene_info && (
+                          <small className="text-muted">Scene: {context.scene_info}</small>
+                        )}
                       </div>
-                      <div className="movie-dialogue">
-                        <strong>Dialogue:</strong> "{context.dialogue}"
-                      </div>
-                      <div className="movie-context">
-                        <strong>Context:</strong> {context.context || 'No additional context available'}
-                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center text-muted p-3">
+                      <p className="mb-0">No context lines retrieved</p>
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
 
-              <div className="explainability-section">
-                <h3>🤖 System Prompt</h3>
-                <div className="system-prompt">
-                  <pre>{explainabilityData.systemPrompt}</pre>
-                </div>
-              </div>
-
-              <div className="explainability-section">
-                <h3>💭 AI Response</h3>
-                <div className="ai-response">
-                  <p>{explainabilityData.llmResponse}</p>
-                </div>
-              </div>
-
-              <div className="explainability-section">
-                <h3>⚡ Performance Analysis</h3>
-                <div className="performance-analysis">
-                  <div className="performance-item">
-                    <span>STT Processing:</span>
-                    <span>{explainabilityData.performance.stt}ms</span>
-                  </div>
-                  <div className="performance-item">
-                    <span>LLM Generation:</span>
-                    <span>{explainabilityData.performance.llm}ms</span>
-                  </div>
-                  <div className="performance-item">
-                    <span>Total Response Time:</span>
-                    <span>{explainabilityData.performance.total}ms</span>
+              {/* System Prompt Section */}
+              {explainabilityData.complete_prompt && (
+                <div className="explainability-section mb-4">
+                  <h6 className="text-primary mb-3">🤖 System Prompt</h6>
+                  <div className="bg-secondary p-3 rounded">
+                    <pre className="mb-0 text-light" style={{ fontSize: '0.8rem', whiteSpace: 'pre-wrap' }}>
+                      {explainabilityData.complete_prompt}
+                    </pre>
                   </div>
                 </div>
+              )}
+
+              {/* AI Response Section */}
+              <div className="explainability-section mb-4">
+                <h6 className="text-primary mb-3">💭 AI Response</h6>
+                <div className="bg-secondary p-3 rounded">
+                  <p className="mb-0">{explainabilityData.response}</p>
+                </div>
               </div>
 
+              {/* Performance Metrics Section */}
+              <div className="explainability-section mb-4">
+                <h6 className="text-primary mb-3">⚡ Performance Metrics</h6>
+                <div className="row">
+                  <div className="col-md-6">
+                    <div className="bg-secondary p-3 rounded mb-2">
+                      <strong>Embedding Latency:</strong> {explainabilityData.embedding_latency || 'N/A'} ms
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="bg-secondary p-3 rounded mb-2">
+                      <strong>Generation Latency:</strong> {explainabilityData.generation_latency || 'N/A'} ms
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="bg-secondary p-3 rounded mb-2">
+                      <strong>Total Tokens:</strong> {explainabilityData.total_tokens || 'N/A'}
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="bg-secondary p-3 rounded mb-2">
+                      <strong>Tokens/Second:</strong> {explainabilityData.tokens_per_second || 'N/A'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Technical Details Section */}
               <div className="explainability-section">
-                <h3>📊 Technical Details</h3>
-                <div className="technical-details">
-                  <p><strong>Timestamp:</strong> {new Date(explainabilityData.timestamp).toLocaleString()}</p>
-                  <p><strong>Character:</strong> {explainabilityData.character}</p>
-                  <p><strong>RAG Results:</strong> {explainabilityData.ragContext.length} movie lines retrieved</p>
-                  <p><strong>Response Length:</strong> {explainabilityData.llmResponse.length} characters</p>
+                <h6 className="text-primary mb-3">📊 Technical Details</h6>
+                <div className="bg-secondary p-3 rounded">
+                  <p className="mb-1"><strong>Timestamp:</strong> {new Date().toLocaleString()}</p>
+                  <p className="mb-1"><strong>Character:</strong> {explainabilityData.request_data?.character}</p>
+                  <p className="mb-1"><strong>Character Total Lines:</strong> {characterStats[explainabilityData.request_data?.character] || 0}</p>
+                  <p className="mb-1"><strong>RAG Results:</strong> {explainabilityData.rag_context?.length || 0} movie lines retrieved</p>
+                  <p className="mb-1"><strong>Total Database Lines:</strong> {totalMovieLines}</p>
+                  <p className="mb-0"><strong>Response Length:</strong> {explainabilityData.response?.length || 0} characters</p>
                 </div>
               </div>
             </div>
+          )}
+        </Modal.Body>
+      </Modal>
+
+      {/* Mobile Sidebar Overlay */}
+      {showSidebar && (
+        <div className="mobile-sidebar-overlay" onClick={() => setShowSidebar(false)}>
+          <div className="mobile-sidebar" onClick={(e) => e.stopPropagation()}>
+            <Card className="h-100 border-0 bg-dark text-light">
+              <Card.Header className="bg-secondary border-0 d-flex justify-content-between align-items-center">
+                <h5 className="mb-0">🎬 Movie Context</h5>
+                <Button variant="outline-light" size="sm" onClick={() => setShowSidebar(false)}>
+                  ✕
+                </Button>
+              </Card.Header>
+              <Card.Body className="p-0">
+                <div className="rag-context-container">
+                  {ragContext.length > 0 ? (
+                    ragContext.map((line, index) => (
+                      <div key={index} className="rag-context-item">
+                        <div className="d-flex justify-content-between align-items-start mb-2">
+                          <small className="text-primary fw-bold">{line.movie_title || 'Star Wars'}</small>
+                          <Badge bg="secondary" className="fs-6">
+                            {(line.similarity_score || line.score || 0).toFixed(3)}
+                          </Badge>
+                        </div>
+                        <div className="rag-dialogue">
+                          <strong className="text-warning">{line.character}:</strong> {line.dialogue}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center text-muted p-4">
+                      <p className="mb-0">No context retrieved yet.</p>
+                    </div>
+                  )}
+                </div>
+              </Card.Body>
+            </Card>
           </div>
         </div>
       )}

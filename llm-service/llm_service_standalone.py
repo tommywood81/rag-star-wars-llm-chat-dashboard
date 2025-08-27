@@ -173,7 +173,7 @@ class RAGLLMService:
             logger.error(f"Database initialization failed: {e}")
             raise RuntimeError(f"Database initialization failed: {e}")
     
-    async def _get_relevant_context(self, message: str, character: str, top_k: int = 6) -> List[Dict[str, Any]]:
+    async def _get_relevant_context(self, message: str, character: str, top_k: int = 3) -> List[Dict[str, Any]]:
         """Retrieve relevant context from the database using vector similarity."""
         if not self.embedding_model:
             return []
@@ -248,23 +248,20 @@ class RAGLLMService:
                            max_tokens: int = 200, temperature: float = 0.7, model_name: str = None) -> Dict[str, Any]:
         """Generate a response using the model factory with RAG context."""
         try:
-            # Build context from retrieved lines
+            # Build ultra-compact context from retrieved lines
             context_text = ""
             if context_lines:
-                context_text = "Here are some relevant quotes from the Star Wars movies:\n\n"
-                for i, line in enumerate(context_lines, 1):
-                    context_text += f"{i}. \"{line['dialogue']}\" (from {line['movie_title']})\n"
+                context_text = "Context:\n"
+                for line in context_lines:
+                    context_text += f"{line.get('character', character)}: \"{line['dialogue']}\" [{line.get('movie_title', 'Star Wars')}]\n"
                 context_text += "\n"
             
-            prompt = f"""You are {character}, a character from Star Wars.
-
-Character Description: {self.characters.get(character, {}).get('description', '')}
-Personality: {self.characters.get(character, {}).get('personality', '')}
-Speaking Style: {self.characters.get(character, {}).get('speaking_style', '')}
-
-{context_text}User: {message}
-
-{character}:"""
+            # Ultra-compact character introduction
+            char_info = self.characters.get(character, {})
+            intro = f"You are {character}. {char_info.get('personality', '')}. Speak {char_info.get('speaking_style', '')}."
+            
+            # Ultra-compact prompt construction
+            prompt = f"{intro}\n\n{context_text}User: {message}\n\n{character}:"
             
             # Use model factory to generate response
             generated_text = self.model_factory.generate_response(

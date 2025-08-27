@@ -97,7 +97,7 @@ class StarWarsChatApp(StarWarsRAGApp):
     def chat_with_character(self, 
                            user_message: str, 
                            character: str,
-                           max_context_lines: int = 6,
+                           max_context_lines: int = 3,
                            conversation_history: Optional[List[Dict[str, str]]] = None,
                            temperature: float = 0.7,
                            max_tokens: int = 150) -> Dict[str, Any]:
