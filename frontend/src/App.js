@@ -137,9 +137,19 @@ function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  // Scroll to top when component loads
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Scroll to top on initial load
+  useEffect(() => {
+    scrollToTop();
+  }, []);
 
   // Health check
   useEffect(() => {
