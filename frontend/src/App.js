@@ -28,6 +28,7 @@ function App() {
   const [availableModels, setAvailableModels] = useState({});
   const [userInput, setUserInput] = useState('');
   const [showSidebar, setShowSidebar] = useState(false);
+  const [showReadme, setShowReadme] = useState(false);
   
   // Character statistics from the processed data
   const characterStats = {
@@ -221,6 +222,75 @@ function App() {
     setMessages([]);
     setRagContext([]);
     setExplainabilityData(null);
+  };
+
+  // Speech-to-Text functionality
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      const audioChunks = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        audioChunks.push(event.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+        await sendAudioToSTT(audioBlob);
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = audioChunks;
+      setIsRecording(true);
+      setLiveTranscription('Listening...');
+    } catch (error) {
+      console.error('Error starting recording:', error);
+      alert('Error accessing microphone. Please check permissions.');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      setLiveTranscription('');
+    }
+  };
+
+  const sendAudioToSTT = async (audioBlob) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', audioBlob, 'recording.wav');
+
+      const response = await axios.post('http://localhost:5001/transcribe', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      const transcribedText = response.data.text;
+      setUserInput(transcribedText);
+      setLiveTranscription(`Transcribed: "${transcribedText}"`);
+      
+      // Auto-send the transcribed message after a short delay
+      setTimeout(() => {
+        setLiveTranscription('');
+      }, 3000);
+    } catch (error) {
+      console.error('Error transcribing audio:', error);
+      setLiveTranscription('Error transcribing audio. Please try again.');
+    }
+  };
+
+  const handleRecordingToggle = () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
   };
 
   const getConnectionStatusBadge = () => {
@@ -430,12 +500,21 @@ function App() {
                     </Col>
                   </Row>
                   
+                  {/* Live Transcription */}
+                  {liveTranscription && (
+                    <div className="live-transcription mt-2 p-2 bg-secondary rounded">
+                      <small className="text-light">
+                        <strong>🎤 Live:</strong> {liveTranscription}
+                      </small>
+                    </div>
+                  )}
+
                   {/* Voice Controls */}
                   <div className="voice-controls mt-2 d-flex justify-content-center gap-2">
                     <Button 
                       variant={isRecording ? 'danger' : 'outline-secondary'}
                       size="sm"
-                      onClick={() => setIsRecording(!isRecording)}
+                      onClick={handleRecordingToggle}
                     >
                       {isRecording ? '⏹️ Stop' : '🎤 Record'}
                     </Button>
@@ -445,6 +524,13 @@ function App() {
                       onClick={() => setIsMuted(!isMuted)}
                     >
                       {isMuted ? '🔊 Unmute' : '🔇 Mute'}
+                    </Button>
+                    <Button 
+                      variant="outline-info"
+                      size="sm"
+                      onClick={() => setShowReadme(true)}
+                    >
+                      📖 README
                     </Button>
                   </div>
                 </div>
@@ -658,6 +744,120 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* README Modal */}
+      <Modal 
+        show={showReadme} 
+        onHide={() => setShowReadme(false)}
+        size="lg"
+        className="readme-modal"
+      >
+        <Modal.Header closeButton className="bg-dark text-light">
+          <Modal.Title>🚀 Star Wars Chat App - Technical Overview</Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="bg-dark text-light">
+          <div className="readme-content">
+            
+            {/* Project Overview */}
+            <div className="section mb-4">
+              <h6 className="text-primary mb-2">🎯 Project Overview</h6>
+              <p className="mb-2">Interactive Star Wars character chat application using RAG (Retrieval-Augmented Generation) with real-time speech-to-text and text-to-speech capabilities.</p>
+            </div>
+
+            {/* Architecture */}
+            <div className="section mb-4">
+              <h6 className="text-primary mb-2">🏗️ Architecture</h6>
+              <ul className="mb-0">
+                <li><strong>Frontend:</strong> React with Bootstrap (Port 3000)</li>
+                <li><strong>Backend:</strong> FastAPI microservices architecture</li>
+                <li><strong>Database:</strong> PostgreSQL with pgvector extension</li>
+                <li><strong>Containerization:</strong> Docker Compose orchestration</li>
+              </ul>
+            </div>
+
+            {/* AI Models */}
+            <div className="section mb-4">
+              <h6 className="text-primary mb-2">🤖 AI Models</h6>
+              <div className="row">
+                <div className="col-6">
+                  <strong>Phi-2 (Port 5003):</strong>
+                  <ul className="mb-0">
+                    <li>Microsoft Phi-2 (2.7B parameters)</li>
+                    <li>Higher quality responses</li>
+                    <li>More detailed character interactions</li>
+                  </ul>
+                </div>
+                <div className="col-6">
+                  <strong>TinyLlama (Port 5004):</strong>
+                  <ul className="mb-0">
+                    <li>TinyLlama (1.1B parameters)</li>
+                    <li>Faster response times</li>
+                    <li>Lightweight processing</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* Services */}
+            <div className="section mb-4">
+              <h6 className="text-primary mb-2">🔧 Microservices</h6>
+              <ul className="mb-0">
+                <li><strong>STT Service (Port 5001):</strong> OpenAI Whisper for speech-to-text</li>
+                <li><strong>TTS Service (Port 5002):</strong> ElevenLabs for text-to-speech</li>
+                <li><strong>LLM Services (Ports 5003/5004):</strong> Character-specific AI responses</li>
+                <li><strong>PostgreSQL (Port 5432):</strong> Vector database with Star Wars dialogue</li>
+              </ul>
+            </div>
+
+            {/* RAG System */}
+            <div className="section mb-4">
+              <h6 className="text-primary mb-2">🧠 RAG System</h6>
+              <ul className="mb-0">
+                <li><strong>Vector Embeddings:</strong> Sentence transformers for dialogue encoding</li>
+                <li><strong>Similarity Search:</strong> pgvector for context retrieval</li>
+                <li><strong>Context Injection:</strong> Relevant dialogue injected into prompts</li>
+                <li><strong>Character Consistency:</strong> Maintains character personality and style</li>
+              </ul>
+            </div>
+
+            {/* Data */}
+            <div className="section mb-4">
+              <h6 className="text-primary mb-2">📊 Data Sources</h6>
+              <ul className="mb-0">
+                <li><strong>Original Trilogy:</strong> A New Hope, Empire Strikes Back, Return of the Jedi</li>
+                <li><strong>Characters:</strong> 12 main characters with 1,847 total dialogue lines</li>
+                <li><strong>Processing:</strong> Automated dialogue extraction and character mapping</li>
+                <li><strong>Embeddings:</strong> Pre-computed vector representations for fast retrieval</li>
+              </ul>
+            </div>
+
+            {/* Features */}
+            <div className="section mb-4">
+              <h6 className="text-primary mb-2">✨ Key Features</h6>
+              <ul className="mb-0">
+                <li><strong>Voice Interaction:</strong> Real-time speech-to-text and text-to-speech</li>
+                <li><strong>Model Switching:</strong> Dynamic selection between Phi-2 and TinyLlama</li>
+                <li><strong>Explainability:</strong> Detailed RAG process transparency</li>
+                <li><strong>Responsive Design:</strong> Mobile-friendly Bootstrap interface</li>
+                <li><strong>Character Stats:</strong> Dialogue line counts and database metrics</li>
+              </ul>
+            </div>
+
+            {/* Tech Stack */}
+            <div className="section">
+              <h6 className="text-primary mb-2">🛠️ Tech Stack</h6>
+              <ul className="mb-0">
+                <li><strong>Frontend:</strong> React, Bootstrap, Axios</li>
+                <li><strong>Backend:</strong> FastAPI, Python, Uvicorn</li>
+                <li><strong>AI/ML:</strong> Whisper, Sentence Transformers, Local LLMs</li>
+                <li><strong>Database:</strong> PostgreSQL, pgvector</li>
+                <li><strong>Infrastructure:</strong> Docker, Docker Compose</li>
+              </ul>
+            </div>
+
+          </div>
+        </Modal.Body>
+      </Modal>
     </div>
   );
 }

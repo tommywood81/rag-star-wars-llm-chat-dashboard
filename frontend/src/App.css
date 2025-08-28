@@ -589,3 +589,59 @@ body {
   border-color: #4A90E2 !important;
   color: #FFFFFF !important;
 }
+
+/* README Modal Styles */
+.readme-modal .modal-content {
+  background-color: #2E2E2E;
+  border: 1px solid #444;
+}
+
+.readme-modal .modal-header {
+  border-bottom: 1px solid #444;
+}
+
+.readme-modal .modal-body {
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.readme-content .section {
+  border-left: 3px solid #27AE60;
+  padding-left: 15px;
+  margin-bottom: 20px;
+}
+
+.readme-content .section h6 {
+  color: #27AE60;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.readme-content ul {
+  padding-left: 20px;
+  margin-bottom: 0;
+}
+
+.readme-content li {
+  margin-bottom: 5px;
+  line-height: 1.4;
+}
+
+.readme-content .row {
+  margin-left: -10px;
+  margin-right: -10px;
+}
+
+.readme-content .col-6 {
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+.readme-content p {
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+
+.readme-content strong {
+  color: #4A90E2;
+}
