@@ -24,6 +24,7 @@ class DockerComposeDeployer:
             "stt": {"port": 5001, "description": "Speech-to-Text Service"},
             "tts": {"port": 5002, "description": "Text-to-Speech Service"},
             "llm": {"port": 5003, "description": "LLM Service"},
+            "llm-tinyllama": {"port": 5004, "description": "LLM Service (TinyLlama)"},
             "frontend": {"port": 3000, "description": "React Frontend"},
             "postgres": {"port": 5432, "description": "PostgreSQL Database"}
         }

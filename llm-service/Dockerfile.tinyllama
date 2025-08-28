@@ -25,7 +25,7 @@ RUN wget -O /app/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf \
     https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf
 
 # Copy application code
-COPY llm-service/llm_service_standalone.py /app/llm_service.py
+COPY llm-service/llm_service_tinyllama.py /app/llm_service.py
 COPY llm-service/model_factory.py /app/model_factory.py
 COPY llm-service/characters.json /app/characters.json
 COPY requirements.txt /app/requirements.txt
