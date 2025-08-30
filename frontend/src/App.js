@@ -155,7 +155,7 @@ function App() {
   useEffect(() => {
     const checkHealth = async () => {
       try {
-        const response = await axios.get('http://localhost:5003/health');
+        const response = await axios.get('/api/health');
         setConnectionStatus('healthy');
       } catch (error) {
         setConnectionStatus('error');
@@ -184,7 +184,9 @@ function App() {
 
     try {
       const selectedModelData = models[selectedModel];
-      const response = await axios.post(`http://localhost:${selectedModelData.port}/chat`, {
+      // Route to different endpoints based on model
+      const endpoint = selectedModel === 'tinyllama' ? '/llm/chat' : '/api/chat';
+      const response = await axios.post(endpoint, {
         character: selectedCharacter,
         message: userMessage,
         session_id: 'test-session'
@@ -237,8 +239,20 @@ function App() {
   // Speech-to-Text functionality
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          sampleRate: 16000,
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true
+        } 
+      });
+      
+      // Try to use a more compatible format
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+      console.log('Using MIME type:', mimeType);
+      
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
       const audioChunks = [];
 
       mediaRecorder.ondataavailable = (event) => {
@@ -246,7 +260,7 @@ function App() {
       };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+        const audioBlob = new Blob(audioChunks, { type: mimeType });
         await sendAudioToSTT(audioBlob);
         stream.getTracks().forEach(track => track.stop());
       };
@@ -272,10 +286,13 @@ function App() {
 
   const sendAudioToSTT = async (audioBlob) => {
     try {
+      console.log('Audio blob type:', audioBlob.type);
+      console.log('Audio blob size:', audioBlob.size);
+      
       const formData = new FormData();
       formData.append('file', audioBlob, 'recording.wav');
 
-      const response = await axios.post('http://localhost:5001/transcribe', formData, {
+      const response = await axios.post('/stt/transcribe', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -291,6 +308,7 @@ function App() {
       }, 3000);
     } catch (error) {
       console.error('Error transcribing audio:', error);
+      console.error('Error details:', error.response?.data);
       setLiveTranscription('Error transcribing audio. Please try again.');
     }
   };
