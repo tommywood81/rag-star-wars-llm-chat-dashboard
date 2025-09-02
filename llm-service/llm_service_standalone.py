@@ -217,15 +217,17 @@ class RAGLLMService:
                     dl.cleaned_dialogue, 
                     dl.scene_info, 
                     m.title as movie_title,
-                    1 - (dl.embedding <=> $2) as similarity_score
+                    1 - (dl.embedding <=> $2::vector) as similarity_score
                 FROM dialogue_lines dl
                 JOIN movies m ON dl.movie_id = m.id
                 WHERE dl.character_id = $1
-                ORDER BY dl.embedding <=> $2
+                ORDER BY dl.embedding <=> $2::vector
                 LIMIT $3
                 """
                 
-                rows = await conn.fetch(query, character_id, str(message_embedding.tolist()), top_k)
+                # Format embedding for PostgreSQL vector type
+                embedding_str = '[' + ','.join(map(str, message_embedding.tolist())) + ']'
+                rows = await conn.fetch(query, character_id, embedding_str, top_k)
                 
                 context_lines = []
                 for row in rows:
