@@ -85,7 +85,7 @@ services:
 
   # PostgreSQL Database with pgvector
   postgres:
-    image: pgvector/pgvector:pg15
+    image: tommyboy777/pgvector-pg15:latest
     container_name: star_wars_postgres
     environment:
       - POSTGRES_DB=star_wars_rag
@@ -103,23 +103,48 @@ services:
       retries: 3
       start_period: 30s
 
-  # Frontend Service (Optimized)
-  frontend:
-    image: tommyboy777/star-wars-chat-app-frontend:latest
-    container_name: star_wars_frontend
+  # API Service
+  api:
+    image: tommyboy777/star-wars-api:latest
+    container_name: star_wars_api
     ports:
-      - "3000:3000"
+      - "8002:8002"
     environment:
-      - REACT_APP_STT_URL=http://star_wars_stt_service:5001
-      - REACT_APP_TTS_URL=http://star_wars_tts_service:5002
-      - REACT_APP_LLM_URL=http://star_wars_llm_service:5003
+      - POSTGRES_HOST=star_wars_postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=star_wars_rag
+      - POSTGRES_USER=starwars_admin
+      - POSTGRES_PASSWORD=your_secure_password_123
+      - STT_URL=http://star_wars_stt_service:5001
+      - TTS_URL=http://star_wars_tts_service:5002
+      - LLM_URL=http://star_wars_llm_service:5003
+    volumes:
+      - ./characters.json:/app/characters.json:ro
     depends_on:
+      postgres:
+        condition: service_healthy
       stt:
         condition: service_healthy
       tts:
         condition: service_healthy
-      postgres:
-        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Frontend Service (Optimized)
+  frontend:
+    image: tommyboy777/star-wars-frontend:latest
+    container_name: star_wars_frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - stt
+      - tts
+      - postgres
     restart: unless-stopped
 
 volumes:

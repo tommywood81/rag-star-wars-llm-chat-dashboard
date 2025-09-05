@@ -14,6 +14,17 @@ RUN npm install --omit=dev
 COPY src/ ./src/
 COPY public/ ./public/
 
+# Set environment variables for build
+ARG REACT_APP_API_URL=http://209.38.89.159:8002
+ARG REACT_APP_STT_URL=http://209.38.89.159:5001
+ARG REACT_APP_TTS_URL=http://209.38.89.159:5002
+ARG REACT_APP_LLM_URL=http://209.38.89.159:5003
+
+ENV REACT_APP_API_URL=$REACT_APP_API_URL
+ENV REACT_APP_STT_URL=$REACT_APP_STT_URL
+ENV REACT_APP_TTS_URL=$REACT_APP_TTS_URL
+ENV REACT_APP_LLM_URL=$REACT_APP_LLM_URL
+
 # Build the application
 RUN npm run build
 

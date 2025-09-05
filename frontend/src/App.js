@@ -24,7 +24,7 @@ function App() {
   const [isTtsPlaying, setIsTtsPlaying] = useState(false);
   const [showExplainability, setShowExplainability] = useState(false);
   const [explainabilityData, setExplainabilityData] = useState(null);
-  const [selectedModel, setSelectedModel] = useState('phi-2');
+  const [selectedModel, setSelectedModel] = useState('tinyllama');
   const [availableModels, setAvailableModels] = useState({});
   const [userInput, setUserInput] = useState('');
   const [showSidebar, setShowSidebar] = useState(false);
@@ -54,14 +54,14 @@ function App() {
     'phi-2': {
       name: 'Phi-2',
       description: 'Microsoft Phi-2 (2.7B parameters)',
-      port: 5003,
+      port: 'http://209.38.89.159:5003',
       icon: '🤖',
       color: '#4A90E2'
     },
     'tinyllama': {
       name: 'TinyLlama',
       description: 'TinyLlama (1.1B parameters)',
-      port: 5004,
+      port: 'http://209.38.89.159:5004',
       icon: '⚡',
       color: '#27AE60'
     }
@@ -155,7 +155,7 @@ function App() {
   useEffect(() => {
     const checkHealth = async () => {
       try {
-        const response = await axios.get('http://localhost:5003/health');
+        const response = await axios.get('http://209.38.89.159:5003/health');
         setConnectionStatus('healthy');
       } catch (error) {
         setConnectionStatus('error');
@@ -184,10 +184,9 @@ function App() {
 
     try {
       const selectedModelData = models[selectedModel];
-      const response = await axios.post(`http://localhost:${selectedModelData.port}/chat`, {
+      const response = await axios.post(`${selectedModelData.port}/chat`, {
         character: selectedCharacter,
-        message: userMessage,
-        session_id: 'test-session'
+        message: userMessage
       });
 
       const characterMessage = {
@@ -275,7 +274,7 @@ function App() {
       const formData = new FormData();
       formData.append('file', audioBlob, 'recording.wav');
 
-      const response = await axios.post('http://localhost:5001/transcribe', formData, {
+      const response = await axios.post('http://209.38.89.159:5001/transcribe', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -390,7 +389,7 @@ function App() {
                         <div className="d-flex justify-content-between align-items-start mb-2">
                           <small className="text-primary fw-bold">{line.movie_title || 'Star Wars'}</small>
                           <Badge bg="secondary" className="fs-6">
-                            {(line.similarity_score || line.score || 0).toFixed(3)}
+                            {(line.similarity_score || line.similarity || line.score || 0).toFixed(3)}
                           </Badge>
                         </div>
                         <div className="rag-dialogue">
@@ -634,7 +633,7 @@ function App() {
                       <div key={index} className="rag-context-item-modal mb-3">
                         <div className="d-flex justify-content-between align-items-start mb-2">
                           <span className="text-warning fw-bold">{context.movie_title || 'Star Wars'}</span>
-                          <Badge bg="secondary">Score: {(context.similarity_score || context.score || 0).toFixed(3)}</Badge>
+                          <Badge bg="secondary">Score: {(context.similarity_score || context.similarity || context.score || 0).toFixed(3)}</Badge>
                         </div>
                         <div className="bg-secondary p-2 rounded">
                           <strong className="text-primary">{context.character}:</strong> "{context.dialogue}"
@@ -735,7 +734,7 @@ function App() {
                         <div className="d-flex justify-content-between align-items-start mb-2">
                           <small className="text-primary fw-bold">{line.movie_title || 'Star Wars'}</small>
                           <Badge bg="secondary" className="fs-6">
-                            {(line.similarity_score || line.score || 0).toFixed(3)}
+                            {(line.similarity_score || line.similarity || line.score || 0).toFixed(3)}
                           </Badge>
                         </div>
                         <div className="rag-dialogue">
