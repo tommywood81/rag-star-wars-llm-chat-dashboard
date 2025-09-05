@@ -1,218 +1,353 @@
 # Star Wars RAG Chat Application
 
-A production-ready retrieval-augmented generation (RAG) system for chatting with Star Wars characters using dialogue from the original scripts.
+A production-ready Retrieval-Augmented Generation (RAG) system that brings Star Wars characters to life through AI-powered conversations using authentic dialogue from the original movie scripts.
 
-## 🌟 Features
+## Overview
 
-- **Script Processing**: Extracts and cleans dialogue from Star Wars script files
-- **Semantic Embeddings**: Uses sentence-transformers for high-quality text embeddings
-- **Smart Retrieval**: Find relevant dialogue based on semantic similarity
-- **Character-Specific Chat**: Get responses filtered by specific characters
-- **Comprehensive Testing**: Full test suite with real data validation
-- **Production Ready**: Clean architecture with proper error handling
+This project demonstrates advanced NLP techniques by creating an intelligent chat system that allows users to converse with iconic Star Wars characters like Luke Skywalker, Darth Vader, and Han Solo. The system uses Retrieval-Augmented Generation (RAG) to provide contextually relevant responses by retrieving and incorporating actual dialogue from the original Star Wars trilogy scripts.
 
-## 🚀 Quick Start
+### Key Achievements
 
-### 1. Setup Environment
+- 2,267 dialogue lines processed from Star Wars scripts with semantic embeddings
+- Real-time similarity search using pgvector and PostgreSQL
+- Multi-model support with TinyLlama (1.1B) and Phi-2 (2.7B) parameters
+- Production deployment on DigitalOcean with Docker containerization
+- Full-stack application with React frontend and FastAPI backend services
+- Advanced RAG pipeline with explainability features and similarity scoring
 
-```bash
-# Activate virtual environment
-.\env\Scripts\Activate.ps1  # Windows
-# source env/bin/activate    # Linux/Mac
+### Technical Highlights
 
-# Install dependencies
-pip install -r requirements.txt
+- Semantic Search: Uses sentence-transformers (all-MiniLM-L6-v2) for 384-dimensional embeddings
+- Vector Database: PostgreSQL with pgvector extension for efficient similarity queries
+- Microservices Architecture: Separate services for LLM, STT, TTS, and API
+- Real-time Processing: Live speech-to-text and text-to-speech capabilities
+- Character Context: Retrieves the 3 most relevant movie lines for each conversation
+
+## Features
+
+### Character Chat System
+- Authentic Responses: Characters respond using their actual movie dialogue
+- Context-Aware: Retrieves relevant dialogue based on conversation context
+- Multi-Character Support: Chat with Luke Skywalker, Darth Vader, Han Solo, and more
+- Personality Preservation: Maintains character-specific speaking styles and traits
+
+### Advanced RAG Implementation
+- Semantic Retrieval: Finds contextually relevant dialogue using vector similarity
+- Explainability: Shows which movie lines influenced each response
+- Similarity Scoring: Displays confidence scores for retrieved context
+- Character Filtering: Retrieves dialogue specific to the selected character
+
+### Multi-Modal Interface
+- Voice Input: Speech-to-text for natural conversation
+- Voice Output: Text-to-speech for character responses
+- Visual Dashboard: Real-time display of retrieved movie context
+- Model Selection: Choose between TinyLlama (fast) and Phi-2 (detailed) models
+
+### Production Architecture
+- Docker Containerization: Fully containerized microservices
+- Database Integration: PostgreSQL with pgvector for vector operations
+- API-First Design: RESTful APIs for all services
+- Scalable Deployment: Ready for cloud deployment and scaling
+
+## Live Demo
+
+**Try the Live Application**: http://209.38.89.159:3000
+
+Experience the full system with:
+- Real-time character conversations
+- Voice input/output capabilities
+- Live RAG context display
+- Model comparison (TinyLlama vs Phi-2)
+
+## Architecture
+
+The system follows a microservices architecture with the following components:
+
+- **React Frontend**: User interface for chat interactions
+- **API Gateway**: Central service orchestrating all backend operations
+- **LLM Services**: Two separate services for different language models
+- **STT Service**: Speech-to-text processing using Whisper
+- **TTS Service**: Text-to-speech synthesis using gTTS
+- **PostgreSQL Database**: Vector database with pgvector extension
+
+The RAG pipeline works by:
+1. Processing user queries through embedding generation
+2. Performing vector similarity search against the dialogue database
+3. Retrieving the most relevant context lines
+4. Generating responses using the retrieved context
+
+## System Performance
+
+### Data Processing Results
+- Total Dialogue Lines: 2,267 processed and embedded
+- Characters: 109 unique characters identified
+- Movies: Complete original trilogy (A New Hope, Empire Strikes Back, Return of the Jedi)
+- Top Characters by Line Count:
+  - Han Solo: 399 lines
+  - Luke Skywalker: 394 lines
+  - C-3PO: 248 lines
+  - Princess Leia: 222 lines
+  - Darth Vader: 120 lines
+
+### Performance Metrics
+- Embedding Model: all-MiniLM-L6-v2 (384 dimensions)
+- Retrieval Speed: Sub-second similarity search
+- Context Quality: 0.4-0.6 similarity scores for relevant dialogue
+- Model Performance: 
+  - TinyLlama: ~2-3 second response time
+  - Phi-2: ~10-15 second response time
+
+## Technology Stack
+
+### Backend Services
+- FastAPI: High-performance API framework
+- PostgreSQL + pgvector: Vector database for similarity search
+- sentence-transformers: Semantic embedding generation
+- TinyLlama/Phi-2: Local LLM inference
+- Whisper: Speech-to-text processing
+- gTTS: Text-to-speech synthesis
+
+### Frontend
+- React: Modern UI framework
+- Bootstrap: Responsive design system
+- Axios: HTTP client for API communication
+
+### Infrastructure
+- Docker: Containerization and orchestration
+- DigitalOcean: Cloud deployment platform
+- Docker Compose: Multi-service orchestration
+
+## Port Configuration
+
+The application uses the following ports for different services:
+
+### External Ports (Accessible from outside)
+| Port | Service | Description | URL |
+|------|---------|-------------|-----|
+| 3000 | Frontend | React web application | http://localhost:3000 |
+| 5001 | STT Service | Speech-to-text API | http://localhost:5001 |
+| 5002 | TTS Service | Text-to-speech API | http://localhost:5002 |
+| 5003 | LLM Service (Phi-2) | Large Language Model API | http://localhost:5003 |
+| 5004 | LLM Service (TinyLlama) | Fast LLM API | http://localhost:5004 |
+| 5432 | PostgreSQL | Database server | localhost:5432 |
+| 8002 | API Gateway | Main API service | http://localhost:8002 |
+
+### Internal Ports (Docker network only)
+| Port | Service | Description |
+|------|---------|-------------|
+| 5001 | STT Service | Internal container port |
+| 5002 | TTS Service | Internal container port |
+| 5003 | LLM Services | Internal container port (both models) |
+| 5432 | PostgreSQL | Internal database port |
+| 8002 | API Gateway | Internal API port |
+
+### Service Communication Flow
+```
+Frontend (3000) → API Gateway (8002) → {
+    ├── STT Service (5001)
+    ├── TTS Service (5002)
+    ├── LLM Service (5003/5004)
+    └── PostgreSQL (5432)
+}
 ```
 
-### 2. Run the Demo
+### Port Usage Notes
+- Frontend (3000): Main user interface, serves the React application
+- API Gateway (8002): Central API that orchestrates all backend services
+- STT Service (5001): Handles speech-to-text conversion using Whisper
+- TTS Service (5002): Converts text to speech using gTTS
+- LLM Services (5003/5004): 
+  - Port 5003: Phi-2 model (2.7B parameters, more detailed responses)
+  - Port 5004: TinyLlama model (1.1B parameters, faster responses)
+- PostgreSQL (5432): Vector database with pgvector extension for RAG
+
+### Production Deployment
+In production, the application is deployed on DigitalOcean with the same port configuration:
+- Live Demo: http://209.38.89.159:3000
+- All services are accessible via the droplet's public IP address
+
+## Quick Start
+
+### Prerequisites
+- Docker and Docker Compose
+- Python 3.11+
+- Node.js 18+
+
+### Local Development
 
 ```bash
-python demo.py
+# Clone the repository
+git clone https://github.com/yourusername/star-wars-chat-app.git
+cd star-wars-chat-app
+
+# Start all services
+docker-compose up -d
+
+# Access the application
+open http://localhost:3000
 ```
 
-This will:
-- Process Star Wars script files
-- Generate semantic embeddings
-- Demonstrate character chat functionality
-- Show retrieval quality metrics
+### Production Deployment
 
-### 3. Run Tests
+```bash
+# Deploy to DigitalOcean
+docker-compose -f docker-compose.production.yml up -d
+
+# Verify services
+docker ps
+```
+
+## Project Structure
+
+```
+star-wars-chat-app/
+├── frontend/                 # React frontend application
+│   ├── src/App.js           # Main application component
+│   └── Dockerfile           # Frontend containerization
+├── llm-service/             # LLM inference service
+│   ├── llm_service_standalone.py    # Phi-2 service
+│   ├── llm_service_tinyllama.py     # TinyLlama service
+│   └── model_factory.py     # Model management
+├── stt-service/             # Speech-to-text service
+├── tts-service/             # Text-to-speech service
+├── src/star_wars_rag/       # Core RAG implementation
+│   ├── embeddings.py        # Embedding generation
+│   ├── retrieval.py         # Vector similarity search
+│   └── database.py          # Database operations
+├── data/                    # Star Wars script data
+│   ├── raw/                 # Original script files
+│   └── processed/           # Processed dialogue data
+├── tests/                   # Comprehensive test suite
+├── docker-compose.yml       # Development orchestration
+└── docker-compose.production.yml  # Production deployment
+```
+
+## Testing
 
 ```bash
 # Run all tests
 python -m pytest tests/ -v
 
-# Run only unit tests (fast)
-python -m pytest tests/ -k "not (real_data or slow or integration)" -v
-
-# Run integration tests with real data
-python -m pytest tests/ -m "integration and real_data" -v
-```
-
-## 📁 Project Structure
-
-```
-star-wars-chat-app/
-├── src/star_wars_rag/           # Main application package
-│   ├── __init__.py              # Package initialization
-│   ├── data_processor.py        # Script processing and dialogue extraction
-│   ├── embeddings.py           # Embedding generation and management
-│   ├── retrieval.py            # Dialogue retrieval and similarity search
-│   └── app.py                  # High-level application interface
-├── tests/                      # Comprehensive test suite
-│   ├── conftest.py             # Test configuration and fixtures
-│   ├── test_data_processor.py  # Data processing tests
-│   ├── test_embeddings.py      # Embedding system tests
-│   ├── test_retrieval.py       # Retrieval system tests
-│   ├── test_app.py             # Application-level tests
-│   └── test_integration.py     # End-to-end integration tests
-├── data/raw/                   # Star Wars script files
-├── notebooks/                  # Original exploration notebooks
-├── demo.py                     # Demo script
-├── requirements.txt            # Python dependencies
-└── pytest.ini                 # Test configuration
-```
-
-## 🔧 Core Components
-
-### DialogueProcessor
-Extracts and cleans character dialogue from script files:
-- Parses script format and identifies dialogue
-- Normalizes character names
-- Filters low-quality dialogue
-- Supports multiple script formats
-
-### StarWarsEmbedder  
-Generates semantic embeddings for dialogue:
-- Uses sentence-transformers (all-MiniLM-L6-v2)
-- Efficient batch processing
-- CPU-friendly for deployment
-- Embedding validation and quality checks
-
-### DialogueRetriever
-Retrieval system for finding relevant dialogue:
-- Semantic similarity search
-- Character and movie filtering
-- Configurable similarity thresholds
-- Content-based text search
-
-### StarWarsRAGApp
-High-level application interface:
-- Complete pipeline from scripts to chat
-- Character-specific responses
-- System statistics and quality metrics
-- Save/load processed data and embeddings
-
-## 📊 System Performance
-
-Based on A New Hope processing:
-- **Dialogue Lines**: 944 clean dialogue lines extracted
-- **Characters**: 27 characters with sufficient dialogue
-- **Top Characters**: Luke (230), Han (142), C-3PO (116), Obi-Wan (75)
-- **Embedding Model**: all-MiniLM-L6-v2 (384 dimensions)
-- **Processing Time**: ~1 minute for full pipeline
-- **Memory Usage**: ~3.5MB for embeddings
-
-## 🧪 Testing Strategy
-
-### Test Categories
-- **Unit Tests**: Fast tests for individual components
-- **Integration Tests**: End-to-end pipeline testing  
-- **Real Data Tests**: Validation with actual Star Wars scripts
-- **Performance Tests**: Large dataset handling
-
-### Test Markers
-```bash
 # Run specific test categories
-pytest -m unit           # Unit tests only
-pytest -m integration    # Integration tests
-pytest -m real_data      # Tests using real script data
-pytest -m slow           # Longer-running tests
+python -m pytest tests/ -k "not integration" -v  # Unit tests
+python -m pytest tests/ -m integration -v         # Integration tests
+
+# Test RAG functionality
+python -m pytest tests/test_retrieval.py -v
 ```
 
-### Coverage Areas
-- ✅ Script processing and dialogue extraction
-- ✅ Character name normalization
-- ✅ Embedding generation and validation
-- ✅ Similarity computation and retrieval
-- ✅ Character-specific filtering
-- ✅ Error handling and edge cases
-- ✅ Save/load functionality
-- ✅ End-to-end pipeline validation
+## Usage Examples
 
-## 🎯 Usage Examples
-
-### Basic Usage
+### Basic Character Chat
 
 ```python
+# Initialize the RAG system
 from star_wars_rag import StarWarsRAGApp
 
-# Initialize and load system
 app = StarWarsRAGApp()
-app.load_from_scripts("data/raw/", pattern="*.txt")
+app.load_from_scripts("data/raw/")
 
-# Chat with a character
+# Chat with Luke Skywalker
 response = app.chat_with_character(
     "Tell me about the Force", 
     "Luke Skywalker"
 )
+
 print(f"{response['character']}: {response['response']}")
-
-# Search all dialogue
-results = app.search_dialogue("I have a bad feeling", top_k=3)
-for result in results:
-    print(f"[{result['similarity']:.3f}] {result['character']}: {result['dialogue']}")
+print(f"Context: {response['rag_context']}")
 ```
 
-### Advanced Features
+### API Usage
 
-```python
-# Get system statistics
-stats = app.get_system_stats()
-print(f"Total dialogue: {stats['total_dialogue_lines']}")
-print(f"Characters: {stats['characters']}")
-
-# Test retrieval quality
-quality = app.test_retrieval_quality()
-print(f"Average results per query: {quality['average_results_per_query']}")
-
-# Character-specific samples
-samples = app.get_character_dialogue_sample("Darth Vader", sample_size=5)
+```bash
+# Chat with a character via API
+curl -X POST http://localhost:5003/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Hello Luke, how are you?",
+    "character": "Luke Skywalker"
+  }'
 ```
 
-## 🚀 Next Steps
+## RAG Implementation Details
 
-### Immediate Enhancements
-- **LLM Integration**: Connect with OpenAI/Anthropic for full conversations
-- **Web Interface**: Build Streamlit/Flask web app
-- **Vector Database**: Integrate with Pinecone/Weaviate for scalability
-- **More Scripts**: Process complete Star Wars saga
+### Embedding Generation
+- Model: sentence-transformers/all-MiniLM-L6-v2
+- Dimensions: 384
+- Context: Character + Movie + Scene + Dialogue
+- Processing: Batch processing for efficiency
 
-### Deployment Options
-- **Docker Container**: Containerized deployment
-- **API Service**: RESTful API with FastAPI
-- **Cloud Deployment**: AWS/GCP deployment guide
-- **Chat Interface**: Discord/Slack bot integration
+### Similarity Search
+- Algorithm: Cosine similarity using pgvector
+- Index: IVFFlat index for fast retrieval
+- Threshold: Top 3 most similar dialogue lines
+- Filtering: Character-specific context retrieval
 
-## 🏗️ Architecture Principles
+### Response Generation
+- Context Injection: Retrieved dialogue included in prompt
+- Character Consistency: Personality and speaking style preserved
+- Explainability: Shows which movie lines influenced response
 
-- **Modular Design**: Loosely coupled components
-- **Production Quality**: Comprehensive error handling and logging
-- **Test-Driven**: Extensive test coverage with real data
-- **Performance Optimized**: Efficient batch processing and caching
-- **Extensible**: Easy to add new features and data sources
+## Future Enhancements
 
-## 📈 Quality Metrics
+### Planned Features
+- Extended Universe: Include prequels, sequels, and spin-offs
+- Character Relationships: Context-aware responses based on character interactions
+- Scene Context: Include scene descriptions for richer context
+- Multi-language Support: Support for different languages and dubs
 
-- **Code Coverage**: 95%+ test coverage
-- **Performance**: Sub-second retrieval responses
-- **Scalability**: Handles 1000+ dialogue lines efficiently
-- **Reliability**: Comprehensive error handling
-- **Maintainability**: Clean, documented code with type hints
+### Technical Improvements
+- Vector Database Migration: Move to specialized vector databases (Pinecone, Weaviate)
+- Model Fine-tuning: Fine-tune models on Star Wars dialogue
+- Caching Layer: Implement Redis for response caching
+- Monitoring: Add comprehensive logging and metrics
+
+## Performance Optimization
+
+### Database Optimization
+- Indexing: Optimized vector indexes for fast similarity search
+- Connection Pooling: Efficient database connection management
+- Query Optimization: Optimized SQL queries for vector operations
+
+### Model Optimization
+- Quantization: Model quantization for faster inference
+- Batch Processing: Efficient batch processing for embeddings
+- Caching: Response caching for common queries
+
+## Contributing
+
+We welcome contributions! Please see our Contributing Guidelines for details.
+
+### Development Setup
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Submit a pull request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- Star Wars: For the incredible universe and characters
+- OpenAI: For inspiration in RAG system design
+- Hugging Face: For the sentence-transformers library
+- PostgreSQL: For the pgvector extension
 
 ---
 
-**Built with ❤️ for Star Wars fans and NLP enthusiasts**
+Built with passion for Star Wars fans and AI enthusiasts
 
-*May the Force be with your embeddings!* ✨
->>>>>>> production-quality-refactor
+*May the Force be with your embeddings!*
+
+---
+
+## Contact
+
+- GitHub: @yourusername
+- LinkedIn: Your LinkedIn
+- Email: your.email@example.com
+
+**Live Demo**: http://209.38.89.159:3000
