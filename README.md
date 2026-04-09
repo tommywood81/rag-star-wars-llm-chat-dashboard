@@ -51,8 +51,6 @@ This project demonstrates advanced NLP techniques by creating an intelligent cha
 
 ## Live Demo
 
-**Try the Live Application**: http://209.38.89.159:3000
-
 Experience the full system with:
 - Real-time character conversations
 - Voice input/output capabilities
@@ -116,50 +114,6 @@ The RAG pipeline works by:
 - Docker: Containerization and orchestration
 - DigitalOcean: Cloud deployment platform
 - Docker Compose: Multi-service orchestration
-
-## Port Configuration
-
-The application uses the following ports for different services:
-
-### External Ports (Accessible from outside)
-| Port | Service | Description | URL |
-|------|---------|-------------|-----|
-| 3000 | Frontend | React web application | http://localhost:3000 |
-| 5001 | STT Service | Speech-to-text API | http://localhost:5001 |
-| 5002 | TTS Service | Text-to-speech API | http://localhost:5002 |
-| 5003 | LLM Service (Phi-2) | Large Language Model API | http://localhost:5003 |
-| 5004 | LLM Service (TinyLlama) | Fast LLM API | http://localhost:5004 |
-| 5432 | PostgreSQL | Database server | localhost:5432 |
-| 8002 | API Gateway | Main API service | http://localhost:8002 |
-
-### Internal Ports (Docker network only)
-| Port | Service | Description |
-|------|---------|-------------|
-| 5001 | STT Service | Internal container port |
-| 5002 | TTS Service | Internal container port |
-| 5003 | LLM Services | Internal container port (both models) |
-| 5432 | PostgreSQL | Internal database port |
-| 8002 | API Gateway | Internal API port |
-
-### Service Communication Flow
-```
-Frontend (3000) → API Gateway (8002) → {
-    ├── STT Service (5001)
-    ├── TTS Service (5002)
-    ├── LLM Service (5003/5004)
-    └── PostgreSQL (5432)
-}
-```
-
-### Port Usage Notes
-- Frontend (3000): Main user interface, serves the React application
-- API Gateway (8002): Central API that orchestrates all backend services
-- STT Service (5001): Handles speech-to-text conversion using Whisper
-- TTS Service (5002): Converts text to speech using gTTS
-- LLM Services (5003/5004): 
-  - Port 5003: Phi-2 model (2.7B parameters, more detailed responses)
-  - Port 5004: TinyLlama model (1.1B parameters, faster responses)
-- PostgreSQL (5432): Vector database with pgvector extension for RAG
 
 ### Production Deployment
 In production, the application is deployed on DigitalOcean with the same port configuration:
